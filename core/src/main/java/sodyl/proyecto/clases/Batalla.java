@@ -231,31 +231,19 @@ public class Batalla {
             return salida.toString();
         }
 
-        // 2) Fórmula de daño inspirada en Pokémon (simplificada)
+        // 2) Fórmula de daño solicitada
         int nivel = atacante.getNivel();
-        int poder = movimiento.danoBase; // usar daño base como 'power'
-        int ataque = Math.max(1, atacante.getAttackValue());
-        int defensa = Math.max(1, defensor.getDefenseValue());
+        int poder = movimiento.danoBase;
 
-        double base = (((2.0 * nivel) / 5.0 + 2.0) * poder * ((double) ataque / (double) defensa)) / 50.0 + 2.0;
-
-        // Critical hit
-        boolean crit = random.nextDouble() < 0.0625; // ~6.25%
-        double critMultiplier = crit ? 1.5 : 1.0;
-
-        // STAB (same-type attack bonus)
-        double stab = (movimiento.tipo == atacante.getTipo()) ? 1.5 : 1.0;
+        // Daño = (Poder_Ataque * (Nivel_Pokemon + 5)) / 10
+        int danoBaseCalculado = (poder * (nivel + 5)) / 10;
 
         // Type effectiveness
         double efectividad = TablaEficacia.getMultiplicador(movimiento.tipo, defensor.getTipo());
 
-        // Random variation 85-100%
-        double variacion = 0.85 + random.nextDouble() * 0.15;
+        // Aplica el multiplicador de tipo AL FINAL de este cálculo
+        int dano = (int) (danoBaseCalculado * efectividad);
 
-        int dano = (int) Math.max(1, Math.floor(base * critMultiplier * stab * efectividad * variacion));
-
-        if (crit)
-            salida.append(" ¡Golpe crítico!");
         if (efectividad > 1.0)
             salida.append(" ¡Es súper efectivo!");
         else if (efectividad < 1.0 && efectividad > 0.0)
@@ -264,6 +252,7 @@ public class Batalla {
             salida.append(" ¡No tuvo efecto!");
 
         // Aplicar daño
+
         if (efectividad == 0.0) {
             // no hace daño
         } else {

@@ -61,6 +61,7 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Arrays;
+import java.util.function.Supplier;
 import static com.badlogic.gdx.Input.Keys;
 
 public class ScreenMapaTiled implements Screen, InputProcessor {
@@ -91,6 +92,23 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private boolean pennywiseDefeated = false, donValerioDefeated = false;
     private float pennywiseAnimTimer = 0, donValerioAnimTimer = 0;
     private boolean pennywiseFrame1 = true, donValerioFrame1 = true;
+    // Map 4 Info NPC
+    private Texture map4InfoNpcTexture1, map4InfoNpcTexture2;
+    private Image map4InfoNpcActor;
+    private boolean map4InfoNpcFrame1 = true;
+    private float map4InfoNpcAnimTimer = 0;
+
+    // Map 2 Info NPC (Freddy)
+    private Texture freddyMap2Texture1, freddyMap2Texture2;
+    private Image freddyMap2Actor;
+    private boolean freddyMap2Frame1 = true;
+    private float freddyMap2AnimTimer = 0;
+
+    // Map 3 Info NPC (Bonnie)
+    private Texture bonnieTexture1, bonnieTexture2;
+    private Image bonnieActor;
+    private boolean bonnieFrame1 = true;
+    private float bonnieAnimTimer = 0;
 
     private static final float SPEED = 80f;
     private boolean movingUp, movingDown, movingLeft, movingRight;
@@ -157,6 +175,39 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             "40,35", "39,35", "39,36", "40,36", "41,36", "41,37", "40,37", "39,37",
             "39,38", "40,38", "41,38"));
 
+    // Coordenadas de spawn para MAPA 4 - ZONA 1 (fondoBatalla.png)
+    private static final Set<String> VALID_SPAWN_COORDS_MAP4_ZONE1 = new HashSet<>(Arrays.asList(
+            "36,20", "36,19", "35,19", "35,20", "35,21", "35,22", "35,23", "34,23", "34,22", "34,21", "34,20", "34,19",
+            "34,24", "34,25", "34,26", "34,27", "34,28", "34,29", "34,29", "34,30", "34,31", "34,32", "34,33", "35,33",
+            "35,32", "35,31", "35,30", "35,30", "35,29", "35,28", "35,27", "36,29", "36,30", "36,31", "36,31", "36,32",
+            "36,33", "37,32", "37,32", "37,31", "37,30", "37,29", "37,28", "38,29", "38,30", "38,31", "38,31", "38,32",
+            "38,33", "39,30", "39,29", "39,28", "41,28", "41,30", "40,30", "40,29", "33,33", "33,33", "33,32", "33,31",
+            "33,30", "33,29", "33,28", "33,27", "33,26", "33,25", "33,25", "33,24", "33,23", "33,22", "33,21", "33,20",
+            "33,19", "33,19", "33,21", "32,23", "32,24", "32,24", "32,25", "32,26", "32,27", "32,28", "32,29", "32,30",
+            "32,31", "32,32", "32,32", "31,33", "31,32", "31,31", "31,31", "31,30", "31,29", "31,28", "31,28", "31,27",
+            "31,26", "31,25", "31,24", "30,24", "30,25", "30,26", "30,27", "30,27", "30,28", "30,29", "30,30", "30,31",
+            "30,31", "29,32", "29,31", "29,30", "29,29", "29,29", "29,28", "29,27", "28,26", "28,27", "28,28", "28,29",
+            "28,30", "28,30", "27,30", "27,29", "27,28", "27,27", "27,27", "26,26", "26,26", "26,27", "26,26", "26,29",
+            "25,28", "25,25", "25,28", "25,27", "25,26", "32,19", "30,19", "30,19", "30,19"));
+
+    // Coordenadas de spawn para MAPA 4 - ZONA 2 (fondoBatalla4.png)
+    private static final Set<String> VALID_SPAWN_COORDS_MAP4_ZONE2 = new HashSet<>(Arrays.asList(
+            "48,31", "48,32", "48,33", "47,31", "47,32", "47,33", "47,33", "47,34", "47,34", "47,35", "47,36", "47,36",
+            "46,36", "46,35", "46,34", "46,33", "46,32", "46,36", "46,37", "46,37", "46,38", "46,38", "46,39", "46,40",
+            "46,41", "45,41", "45,42", "45,41", "45,40", "45,39", "45,37", "45,36", "45,35", "45,31", "44,31", "43,31",
+            "42,31", "42,31", "42,31", "42,32", "41,33", "40,31", "40,32", "41,32", "42,32", "43,32", "43,33", "43,34",
+            "43,35", "43,36", "43,37", "43,38", "43,38", "44,38", "44,39", "44,40", "44,41", "44,42", "44,42", "45,42",
+            "45,41", "45,40", "45,39", "44,37", "44,37", "44,36", "44,35", "44,35", "42,32", "42,33", "42,34", "42,35",
+            "42,36", "42,37", "42,37", "42,38", "41,38", "41,41", "41,39", "41,40", "41,41", "43,42", "42,42", "42,38",
+            "41,37", "41,36", "41,36", "41,35", "41,34", "41,33", "41,32", "40,32", "40,31", "40,33", "40,34", "40,34",
+            "40,35", "40,36", "40,37", "40,38", "40,39", "40,40", "40,40", "40,41", "39,41", "39,40", "39,39", "39,39",
+            "39,38", "39,37", "39,37", "39,36", "39,35", "39,34", "39,34", "38,34", "37,34", "37,35", "38,35", "37,35",
+            "38,37", "38,38", "39,40", "39,41", "39,40", "39,39", "37,38", "37,37", "37,37", "37,37", "37,36", "37,35",
+            "37,34", "37,35", "37,35", "37,36", "36,37", "36,38", "36,39", "36,40", "36,41", "36,42", "36,43", "36,43",
+            "36,43", "37,43", "38,43", "38,42", "37,42", "37,42", "35,43", "35,42", "35,41", "35,40", "35,39", "35,39",
+            "35,38", "35,37", "35,37", "34,37", "34,38", "34,39", "34,40", "34,41", "34,41", "34,42", "33,41", "33,42",
+            "33,42", "33,42", "33,42", "34,39", "33,39", "32,39", "32,39", "32,39", "33,39", "34,39"));
+
     // Coordenadas de coleccionables para MAPA3 (X,Y)
     private static final Set<String> VALID_COLLECTIBLE_COORDS_MAP3 = new HashSet<>(Arrays.asList(
             // Coordenadas anteriores
@@ -202,10 +253,82 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             "7,22", "7,23", "7,24", "7,25", "7,26", "7,27", "7,28", "7,29", "7,30",
             "6,19", "6,20", "6,21", "6,22", "6,23", "6,24", "6,25", "6,26", "6,27", "6,28", "6,29", "6,30",
             "5,19", "5,20", "5,21", "5,22", "5,23", "5,24", "5,25", "5,26", "5,27", "5,28", "5,29", "5,30",
-            "4,19", "4,20", "4,21", "4,22", "4,23", "4,24", "4,25", "4,26", "4,27", "4,28", "4,29", "4,30",
+            "4,19", "4,20", "4,21", "4,22", "4,23", "4,24", "4,25", "4,26", "4,27", "4,29", "4,30",
             "3,22", "3,23", "3,24", "3,25", "3,26", "3,27", "3,28", "3,29", "3,30",
             "2,22", "2,23", "2,24", "2,25", "2,26", "2,27", "2,28", "2,29", "2,30",
             "1,30"));
+
+    // Coordenadas de coleccionables para MAPA 4 (X,Y)
+    private static final Set<String> VALID_COLLECTIBLE_COORDS_MAP4 = new HashSet<>(Arrays.asList(
+            "20,0", "19,0", "18,0", "17,0", "17,1", "18,1", "19,1", "20,1", "21,1", "22,1", "23,1", "24,1", "25,1",
+            "26,1", "27,1", "28,1", "29,1", "30,0", "30,1", "30,2", "29,2", "28,2", "27,2", "26,2", "25,2", "24,2",
+            "22,2",
+            "21,2", "20,2", "19,2", "18,2", "17,2", "17,4", "16,4", "18,4", "19,4", "20,4", "21,4", "22,4", "23,4",
+            "24,4",
+            "25,4", "26,4", "27,4", "28,4", "29,4", "30,4", "31,4", "31,5", "32,5", "33,5", "30,5", "29,5", "28,5",
+            "27,5",
+            "25,5", "24,5", "23,5", "22,5", "21,5", "20,5", "19,5", "18,5", "17,5", "16,5", "15,5", "14,5", "14,6",
+            "13,6",
+            "15,6", "16,6", "17,6", "18,6", "19,6", "20,6", "21,6", "22,6", "23,6", "24,6", "25,6", "26,6", "27,6",
+            "28,6",
+            "29,6", "30,6", "31,6", "32,6", "33,6", "34,6", "13,7", "12,7", "11,7", "14,7", "15,7", "16,7", "17,7",
+            "18,7",
+            "19,7", "20,7", "21,7", "22,7", "23,7", "24,7", "25,7", "26,7", "27,7", "28,7", "29,7", "30,7", "31,7",
+            "32,7",
+            "33,7", "34,7", "35,7", "36,7", "36,8", "35,8", "34,8", "33,8", "32,8", "31,8", "30,8", "29,8", "28,8",
+            "27,8",
+            "26,8", "25,8", "24,8", "23,8", "22,8", "21,8", "20,8", "19,8", "18,8", "17,8", "16,8", "15,8", "14,8",
+            "13,8",
+            "12,8", "11,8", "11,9", "10,9", "9,9", "8,9", "7,9", "6,9", "5,9", "4,9", "3,9", "2,9", "1,9", "0,9",
+            "12,9",
+            "13,9", "14,9", "15,9", "16,9", "17,9", "18,9", "19,9", "20,9", "21,9", "22,9", "23,9", "24,9", "25,9",
+            "26,9",
+            "27,9", "28,9", "29,9", "30,9", "31,9", "32,9", "33,9", "34,9", "35,9", "36,9", "37,9", "38,9", "39,9",
+            "40,9",
+            "41,9", "42,9", "43,9", "44,9", "45,9", "46,9", "47,9", "48,9", "49,9", "49,10", "48,10", "47,10", "46,10",
+            "45,10", "44,10", "43,10", "42,10", "41,10", "40,10", "39,10", "38,10", "37,10", "36,10", "35,10", "34,10",
+            "33,10", "32,10", "31,10", "30,10", "29,10", "28,10", "27,10", "26,10", "25,10", "24,10", "23,10", "22,10",
+            "21,10", "20,10", "19,10", "18,10", "17,10", "16,10", "15,10", "14,10", "13,10", "12,10", "11,10", "10,10",
+            "9,10", "8,10", "7,10", "6,10", "5,10", "4,10", "3,10", "2,10", "1,10", "0,10",
+            "0,11", "0,12", "0,13", "0,14", "0,15", "0,18", "0,19", "0,20", "0,21", "0,22", "0,24", "0,25", "0,26",
+            "0,27",
+            "0,28", "1,15", "1,19", "1,28", "2,14", "2,19", "2,25", "2,26", "2,27", "2,28", "3,14", "3,16", "3,17",
+            "3,18",
+            "3,19", "3,20", "3,21", "3,22", "3,24", "3,25", "3,26", "3,27", "3,28", "4,13", "4,14", "4,15", "4,16",
+            "4,17",
+            "4,19", "4,20", "4,23", "4,24", "5,17", "5,18", "6,17", "6,18", "6,21", "6,22", "7,17", "7,18", "7,21",
+            "7,22",
+            "7,23", "7,24", "7,25", "7,26", "8,13", "8,14", "8,15", "8,16", "9,13", "9,14", "9,15", "9,16", "9,21",
+            "9,22",
+            "9,25", "9,26", "10,13", "10,14", "10,15", "10,16", "10,20", "10,21", "10,22", "10,23", "10,24", "10,25",
+            "10,26", "10,27", "10,28", "11,13", "11,15", "11,16", "11,19", "11,21", "11,22", "11,23", "11,24", "11,25",
+            "11,27", "11,28", "12,12", "12,13", "12,14", "12,15", "12,16", "12,19", "12,20", "12,21", "12,22", "12,23",
+            "12,24", "12,25", "12,26", "12,27", "12,28", "13,13", "13,14", "13,16", "13,19", "13,20", "13,23", "13,27",
+            "13,28", "14,13", "14,14", "14,15", "14,16", "14,19", "14,27", "14,28", "15,13", "15,14", "15,15", "15,16",
+            "16,13", "16,14", "16,18", "16,19", "16,26", "16,27", "17,13", "17,14", "17,15", "17,16", "17,18", "17,20",
+            "17,21", "17,22", "17,23", "17,24", "17,25", "17,27", "18,12", "18,14", "18,15", "18,16", "18,18", "18,19",
+            "18,20", "18,22", "18,23", "18,24", "18,25", "18,26", "19,14", "19,15", "19,16", "19,18", "19,19", "19,20",
+            "19,21", "19,22", "19,23", "19,24", "19,25", "19,26", "20,13", "20,14", "20,15", "20,16", "20,23", "20,26",
+            "20,27", "21,13", "21,15", "21,16", "21,23", "21,26", "22,13", "22,15", "22,16", "22,23", "22,24", "22,25",
+            "22,26", "22,27", "22,28", "23,16", "23,17", "23,18", "23,19", "23,20", "23,21", "23,22", "23,24", "23,25",
+            "23,26", "23,27", "23,28", "24,14", "24,15", "24,16", "24,17", "24,18", "24,19", "24,20", "24,21", "24,24",
+            "24,27", "24,28", "25,14", "25,15", "25,16", "25,21", "25,24", "26,14", "26,15", "26,16", "26,20", "26,21",
+            "26,22", "26,23", "26,24", "27,14", "27,15", "27,16", "27,17", "27,18", "27,19", "27,20", "27,21", "27,24",
+            "28,14", "28,15", "28,16", "28,17", "28,18", "28,19", "28,20", "28,22", "28,23", "28,24", "29,14", "29,15",
+            "29,16", "30,14", "30,15", "30,16", "30,44", "30,45", "31,14", "31,16", "32,14", "32,15", "32,16", "33,14",
+            "33,15", "33,16", "34,14", "34,15", "35,14", "35,15", "35,16", "36,14", "36,15", "36,16", "36,25", "37,14",
+            "37,15", "37,16", "37,21", "37,22", "37,23", "37,24", "37,25", "38,14", "38,15", "38,16", "38,19", "38,20",
+            "38,21", "38,22", "39,14", "39,15", "39,16", "39,19", "39,20", "40,14", "40,15", "40,16", "40,19", "40,20",
+            "40,21", "40,23", "40,24", "40,25", "41,14", "41,15", "41,16", "41,18", "41,19", "41,24", "41,25", "42,15",
+            "42,16", "42,17", "42,18", "42,19", "42,24", "42,25", "43,14", "43,15", "43,16", "43,17", "43,18", "43,19",
+            "43,24", "43,25", "43,28", "43,29", "44,14", "44,15", "44,16", "44,17", "44,18", "44,19", "44,20", "44,21",
+            "44,22", "44,24", "44,27", "44,28", "44,29", "44,30", "45,14", "45,15", "45,18", "45,20", "45,21", "45,22",
+            "45,23", "45,24", "45,28", "45,30", "46,14", "46,15", "46,16", "46,17", "46,18", "46,19", "46,21", "46,23",
+            "46,24", "46,25", "46,26", "46,27", "46,28", "46,29", "46,30", "47,14", "47,15", "47,16", "47,17", "47,18",
+            "47,19", "47,21", "47,23", "47,24", "47,25", "47,26", "47,27", "47,28", "47,30", "48,14", "48,15", "48,16",
+            "48,17", "48,18", "48,19", "48,21", "48,23", "48,24", "48,25", "48,27", "48,28", "48,29", "48,30", "49,14",
+            "49,15", "49,16", "49,17", "49,18", "49,19", "49,21", "49,22", "49,23", "49,24", "49,25", "49,26", "49,27",
+            "49,28", "49,29", "49,30"));
 
     // --- SISTEMA DE ENCUENTROS ---
     private Array<EncounterZone> encounterZones;
@@ -350,6 +473,19 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private boolean jotaroDefeated = false;
     private boolean kanekiDefeated = false;
 
+    // --- MAP 4 NPCs ---
+    private Texture jesucristoTexture1, jesucristoTexture2;
+    private Image jesucristoActor;
+    private float jesucristoAnimTimer = 0;
+    private boolean jesucristoFrame1 = true;
+    private boolean jesucristoDefeated = false;
+
+    private Texture aftonTexture1, aftonTexture2;
+    private Image aftonActor;
+    private float aftonAnimTimer = 0;
+    private boolean aftonFrame1 = true;
+    private boolean aftonDefeated = false;
+
     // --- SUBMENUS ---
     private Table inventorySubmenuTable;
 
@@ -365,6 +501,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     // Debug Tool: List to record tiles
     private List<String> recordedTilesList = new ArrayList<>();
+
+    // Variables para el fondo de batalla dínámico
+    private String pendingBattleBackground = null;
 
     /**
      * Constructor único: siempre inicia en estado DIALOGUE.
@@ -537,22 +676,25 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         collisionRects = new Array<>();
 
         // Try multiple possible collision layer names, but ONLY from ObjectGroup layers
-        String[] possibleCollisionLayerNames = { "Capa de Objetos 1", "Colisiones", COLLISION_LAYER_NAME };
+        String[] possibleCollisionLayerNames = { "Capa de Objetos 1", "Colisiones", "COLISIONES" };
         MapLayer collisionObjectLayer = null;
 
-        for (String layerName : possibleCollisionLayerNames) {
-            MapLayer layer = map.getLayers().get(layerName);
-            // Only accept layers that are ObjectGroup layers (contain MapObjects, not
-            // tiles)
-            if (layer != null && layer instanceof com.badlogic.gdx.maps.MapGroupLayer == false
-                    && !(layer instanceof com.badlogic.gdx.maps.tiled.TiledMapTileLayer)) {
-                collisionObjectLayer = layer;
-                Gdx.app.log("COLLISION", "Collision OBJECT layer found: " + layerName);
-                break;
-            } else if (layer != null) {
-                Gdx.app.log("COLLISION", "Skipping non-object layer: " + layerName + " (type: "
-                        + layer.getClass().getSimpleName() + ")");
+        // Búsqueda robusta por nombre (ignora mayúsculas si es necesario)
+        for (String targetName : possibleCollisionLayerNames) {
+            for (MapLayer layer : map.getLayers()) {
+                if (layer.getName() != null && layer.getName().equalsIgnoreCase(targetName)) {
+                    // Only accept layers that are ObjectGroup layers (contain MapObjects, not
+                    // tiles)
+                    if (!(layer instanceof com.badlogic.gdx.maps.MapGroupLayer)
+                            && !(layer instanceof com.badlogic.gdx.maps.tiled.TiledMapTileLayer)) {
+                        collisionObjectLayer = layer;
+                        Gdx.app.log("COLLISION", "Collision OBJECT layer found: " + layer.getName());
+                        break;
+                    }
+                }
             }
+            if (collisionObjectLayer != null)
+                break;
         }
 
         if (collisionObjectLayer != null) {
@@ -597,6 +739,19 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             // Coordenadas LibGDX: Y = 28 a 32
             for (int y = 28; y <= 33; y++) {
                 removeCollisionsAt(0, y);
+            }
+
+            // Salida a Mapa 4 (tiles 22-27, 49)
+            for (int x = 22; x <= 27; x++) {
+                removeCollisionsAt(x, 49);
+            }
+        }
+
+        if (mapPath.equals("Mapa/MAPA 4.tmx")) {
+            // Entrada/Salida desde Mapa 1 (tiles 22-27, 0)
+            for (int x = 22; x <= 27; x++) {
+                removeCollisionsAt(x, 0);
+                removeCollisionsAt(x, 1); // Margen de seguridad
             }
         }
 
@@ -786,8 +941,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             // --- CARGAR NPC FUNTIME FREDDY (Solo en Mapa 1) ---
             // --- FUNTIME FOXY NPC (ANIMATED) - TILE 16, 24 ---
             try {
-                funtimeFoxyTexture1 = new Texture(Gdx.files.internal("imagenes/FuntimeFoxy.png"));
-                funtimeFoxyTexture2 = new Texture(Gdx.files.internal("imagenes/FuntimeFoxy2.png"));
+                funtimeFoxyTexture1 = new Texture(Gdx.files.internal("imagenes/fntFoxy1.png"));
+                funtimeFoxyTexture2 = new Texture(Gdx.files.internal("imagenes/fntFoxy2.png"));
 
                 funtimeFoxyActor = new Image(funtimeFoxyTexture1); // Start with frame 1
 
@@ -859,7 +1014,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 float npcX = 4 * tileWidth * UNIT_SCALE;
                 float npcY = 51 * tileHeight * UNIT_SCALE;
 
-                giornoActor.setSize(5f, 3f);
+                giornoActor.setSize(6f, 4f);
                 giornoActor.setPosition(npcX, npcY);
 
                 stage.addActor(giornoActor);
@@ -883,7 +1038,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 float npcX = 10 * tileWidth * UNIT_SCALE;
                 float npcY = 33 * tileHeight * UNIT_SCALE;
 
-                jotaroActor.setSize(5f, 3f);
+                jotaroActor.setSize(6f, 4f);
                 jotaroActor.setPosition(npcX, npcY);
 
                 stage.addActor(jotaroActor);
@@ -907,7 +1062,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 float npcX = 41 * tileWidth * UNIT_SCALE;
                 float npcY = 44 * tileHeight * UNIT_SCALE;
 
-                kanekiActor.setSize(5f, 3f);
+                kanekiActor.setSize(6f, 4f);
                 kanekiActor.setPosition(npcX, npcY);
 
                 stage.addActor(kanekiActor);
@@ -919,6 +1074,30 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 Gdx.app.log("NPC", "Kaneki (Battle NPC) loaded at (41, 44)");
             } catch (Exception e) {
                 Gdx.app.error("ASSETS", "Could not load Kaneki images", e);
+            }
+
+            // --- FREDDY NPC (INFO) - TILE 29, 29 ---
+            try {
+                freddyMap2Texture1 = new Texture(Gdx.files.internal("spritesMapa2/freddy1.png"));
+                freddyMap2Texture2 = new Texture(Gdx.files.internal("spritesMapa2/freddy2.png"));
+                freddyMap2Texture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+                freddyMap2Texture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+
+                freddyMap2Actor = new Image(new TextureRegionDrawable(new TextureRegion(freddyMap2Texture1)));
+                freddyMap2Actor.setSize(6f, 4f);
+
+                float fX = 29 * tileWidth * UNIT_SCALE;
+                float fY = 29 * tileHeight * UNIT_SCALE;
+                freddyMap2Actor.setPosition(fX, fY);
+
+                stage.addActor(freddyMap2Actor);
+
+                // Add collision
+                collisionRects.add(new Rectangle(fX, fY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
+                Gdx.app.log("NPC", "Freddy Map 2 loaded at (29, 29)");
+
+            } catch (Exception e) {
+                Gdx.app.error("NPC", "Error loading Freddy Map 2 NPC", e);
             }
         }
 
@@ -937,7 +1116,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 float npcX = 14 * tileWidth * UNIT_SCALE;
                 float npcY = 23 * tileHeight * UNIT_SCALE;
 
-                pennywiseActor.setSize(5f, 3f);
+                pennywiseActor.setSize(6f, 4f);
                 pennywiseActor.setPosition(npcX, npcY);
 
                 stage.addActor(pennywiseActor);
@@ -961,7 +1140,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 float npcX = 44 * tileWidth * UNIT_SCALE;
                 float npcY = 30 * tileHeight * UNIT_SCALE;
 
-                donValerioActor.setSize(5f, 3f);
+                donValerioActor.setSize(6f, 4f);
                 donValerioActor.setPosition(npcX, npcY);
 
                 stage.addActor(donValerioActor);
@@ -973,6 +1152,122 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 Gdx.app.log("NPC", "Don Valerio loaded at (44, 30)");
             } catch (Exception e) {
                 Gdx.app.error("ASSETS", "Could not load Don Valerio images", e);
+            }
+
+            // --- BONNIE NPC (INFO) - TILE 2, 28 ---
+            try {
+                bonnieTexture1 = new Texture(Gdx.files.internal("spritesMapa3/bonnie1.png"));
+                bonnieTexture2 = new Texture(Gdx.files.internal("spritesMapa3/bonnie2.png"));
+                bonnieTexture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+                bonnieTexture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+
+                bonnieActor = new Image(new TextureRegionDrawable(new TextureRegion(bonnieTexture1)));
+                bonnieActor.setSize(6f, 4f);
+
+                float iX = 4 * tileWidth * UNIT_SCALE;
+                float iY = 28 * tileHeight * UNIT_SCALE;
+                bonnieActor.setPosition(iX, iY);
+
+                stage.addActor(bonnieActor);
+
+                // Add collision
+                collisionRects.add(new Rectangle(iX, iY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
+                Gdx.app.log("NPC", "Bonnie loaded at (3, 28)");
+
+            } catch (Exception e) {
+                Gdx.app.error("NPC", "Error loading Bonnie NPC", e);
+            }
+        }
+
+        // --- MAP 4 NPCS ---
+        if (mapPath.equals("Mapa/MAPA 4.tmx")) {
+            // Jesucristo - Tile (35, 29)
+            try {
+                jesucristoTexture1 = new Texture(Gdx.files.internal("spritesMapa4/jesucristo1.png"));
+                jesucristoTexture2 = new Texture(Gdx.files.internal("spritesMapa4/jesucristo2.png"));
+                // Set filters
+                jesucristoTexture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+                jesucristoTexture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+
+                jesucristoActor = new Image(new TextureRegionDrawable(new TextureRegion(jesucristoTexture1)));
+                jesucristoActor.setSize(6f, 4f); // Adjust size relative to UNIT_SCALE
+
+                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
+                float tileHeight = map.getProperties().get("tileheight", Integer.class);
+
+                float jX = 0 * tileWidth * UNIT_SCALE;
+                float jY = 4 * tileHeight * UNIT_SCALE;
+                jesucristoActor.setPosition(jX, jY);
+
+                stage.addActor(jesucristoActor);
+
+                // Add collision
+                collisionRects.add(new Rectangle(1 * tileWidth * UNIT_SCALE, 4 * tileHeight * UNIT_SCALE,
+                        tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
+                collisionRects.add(new Rectangle(1 * tileWidth * UNIT_SCALE, 5 * tileHeight * UNIT_SCALE,
+                        tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
+                Gdx.app.log("NPC", "Jesucristo loaded at (0, 4) with collisions at (1, 4) and (1, 5)");
+
+            } catch (Exception e) {
+                Gdx.app.error("NPC", "Error loading Jesucristo NPC", e);
+            }
+
+            // Afton - Tile (44, 38)
+            try {
+                aftonTexture1 = new Texture(Gdx.files.internal("spritesMapa4/afton1.png"));
+                aftonTexture2 = new Texture(Gdx.files.internal("spritesMapa4/afton2.png"));
+
+                aftonTexture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+                aftonTexture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+
+                aftonActor = new Image(new TextureRegionDrawable(new TextureRegion(aftonTexture1)));
+                aftonActor.setSize(6f, 4f);
+
+                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
+                float tileHeight = map.getProperties().get("tileheight", Integer.class);
+
+                float aX = 45 * tileWidth * UNIT_SCALE;
+                float aY = 4 * tileHeight * UNIT_SCALE;
+                aftonActor.setPosition(aX, aY);
+
+                stage.addActor(aftonActor);
+
+                // Add collision
+                collisionRects.add(new Rectangle(46 * tileWidth * UNIT_SCALE, 4 * tileHeight * UNIT_SCALE,
+                        tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
+                collisionRects.add(new Rectangle(46 * tileWidth * UNIT_SCALE, 5 * tileHeight * UNIT_SCALE,
+                        tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
+                Gdx.app.log("NPC", "Afton loaded at (45, 4) with collisions at (46, 4) and (46, 5)");
+
+            } catch (Exception e) {
+                Gdx.app.error("NPC", "Error loading Afton NPC", e);
+            }
+
+            // Info NPC - Tile (19, 12)
+            try {
+                map4InfoNpcTexture1 = new Texture(Gdx.files.internal("spritesMapa4/foxy1.png"));
+                map4InfoNpcTexture2 = new Texture(Gdx.files.internal("spritesMapa4/foxy2.png"));
+                map4InfoNpcTexture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+                map4InfoNpcTexture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+
+                map4InfoNpcActor = new Image(new TextureRegionDrawable(new TextureRegion(map4InfoNpcTexture1)));
+                map4InfoNpcActor.setSize(6f, 4f);
+
+                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
+                float tileHeight = map.getProperties().get("tileheight", Integer.class);
+
+                float iX = 21 * tileWidth * UNIT_SCALE;
+                float iY = 12 * tileHeight * UNIT_SCALE;
+                map4InfoNpcActor.setPosition(iX, iY);
+
+                stage.addActor(map4InfoNpcActor);
+
+                // Add collision
+                collisionRects.add(new Rectangle(iX, iY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
+                Gdx.app.log("NPC", "Map 4 Info NPC loaded at (20, 12)");
+
+            } catch (Exception e) {
+                Gdx.app.error("NPC", "Error loading Map 4 Info NPC", e);
             }
         }
 
@@ -1235,6 +1530,30 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return;
         }
 
+        // --- LÓGICA MAPA 4 ---
+        if (mapPath.equals("Mapa/MAPA 4.tmx")) {
+            int tileX = (int) (playerX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
+            int tileY = (int) (playerY / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
+            String coords = tileX + "," + tileY;
+
+            boolean zone1 = VALID_SPAWN_COORDS_MAP4_ZONE1.contains(coords);
+            boolean zone2 = VALID_SPAWN_COORDS_MAP4_ZONE2.contains(coords);
+
+            if (zone1 || zone2) {
+                if (random.nextFloat() < 0.05f) { // 5% chance per step on valid coordinates
+                    if (zone1) {
+                        pendingBattleBackground = "Mapa/fondoBatalla.jpg";
+                    } else {
+                        pendingBattleBackground = "Mapa/fondoBatalla3.png";
+                    }
+                    Gdx.app.log("SPAWN",
+                            "¡Encuentro activado en Mapa 4 (Coords " + coords + ")! BG: " + pendingBattleBackground);
+                    startBattle(null);
+                }
+            }
+            return;
+        }
+
         // --- LÓGICA MAPA 1 (EXISTENTE) ---
         TiledMapTileLayer layer = (TiledMapTileLayer) map.getLayers().get("NIvel 1");
         if (layer == null) {
@@ -1364,6 +1683,17 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             addCopies(pool, "Vaporeon", 25);
             addCopies(pool, "Jolteon", 25);
 
+        } else if (mapPath.equals("Mapa/MAPA 4.tmx")) {
+            // MAPA 4 - Cyndaquil, Flareon, Charizard, Gyarados
+            // Cyndaquil es común (50)
+            addCopies(pool, "Cyndaquil", 50);
+            // Flareon es poco comùn (30)
+            addCopies(pool, "Flareon", 30);
+            // Charizard es raro (10)
+            addCopies(pool, "Charizard", 10);
+            // Gyarados es muy raro (5)
+            addCopies(pool, "Gyarados", 5);
+
         } else {
             // Default/fallback para otros mapas (Pokemon Center, etc.)
             // Solo usar starters comunes
@@ -1403,7 +1733,11 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         // Determine background based on map
         String backgroundPath;
         // Map 1 uses fondoBatalla.jpg, Map 2 uses fondoBatalla2.png.png, Map 3 varies
-        if (mapPath.equals("Mapa/Mapa2.tmx")) {
+        if (pendingBattleBackground != null) {
+            backgroundPath = pendingBattleBackground;
+            // Reset for next time
+            pendingBattleBackground = null;
+        } else if (mapPath.equals("Mapa/Mapa2.tmx")) {
             backgroundPath = "Mapa/fondoBatalla2.png.png";
         } else if (mapPath.equals("Mapa/MAPA3.tmx")) {
             float playerTileY = characterActor.getY() / (16 * UNIT_SCALE);
@@ -1412,6 +1746,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             } else {
                 backgroundPath = "Mapa/fondoBatalla.jpg";
             }
+        } else if (mapPath.equals("Mapa/MAPA 4.tmx")) {
+            // Fallback/Default for Map 4 if pendingBattleBackground wasn't set (though it
+            // should be)
+            backgroundPath = "Mapa/fondoBatalla.jpg";
         } else {
             // Default for Map 1 and other maps
             backgroundPath = "Mapa/fondoBatalla.jpg";
@@ -1444,6 +1782,20 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             enemyPokemon.setNivel(18);
         } else if (pokemonName.equals("Sylveon")) { // Don Valerio
             enemyPokemon.setNivel(22);
+        } else if (pokemonName.equals("Lucario")) { // Jesucristo
+            enemyPokemon.setNivel(35); // Adjust level as needed
+        } else if (pokemonName.equals("Mewtwo")) { // Afton (override previous Mewtwo check if needed or rely on level
+                                                   // set here)
+            // Note: There was a previous check for Mewtwo at level 25.
+            // If we want Afton's to be stronger, we should check npcName or just letting
+            // the last one win?
+            // Since this is an else-if chain, we should be careful.
+            // Actually, let's refine logic:
+            if (npcName.equals("Afton")) {
+                enemyPokemon.setNivel(40);
+            } else {
+                enemyPokemon.setNivel(25); // Default/Old Mewtwo encounter
+            }
         }
 
         enemyPokemon.actualizarAtributos();
@@ -1460,7 +1812,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         // Map 1 uses fondoBatalla.jpg, Map 2 uses fondoBatalla2.png.png, Map 3 varies
         if (mapPath.equals("Mapa/Mapa2.tmx")) {
             backgroundPath = "Mapa/fondoBatalla2.png.png";
-        } else if (mapPath.equals("Mapa/MAPA3.tmx")) {
+        } else if (mapPath.equals("Mapa/MAPA3.tmx") || mapPath.equals("Mapa/MAPA 4.tmx")) {
             float playerTileY = characterActor.getY() / (16 * UNIT_SCALE);
             if (playerTileY > 25) {
                 backgroundPath = "Mapa/fondoBatalla5.png";
@@ -1515,6 +1867,16 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             dialogueQueue = new LinkedList<>();
             dialogueQueue.add("¡Has derrotado a Don Valerio!");
             dialogueQueue.add("Has demostrado tu valía, joven.");
+        } else if (npcName.equals("Jesucristo")) {
+            jesucristoDefeated = true;
+            dialogueQueue = new LinkedList<>();
+            dialogueQueue.add("Tu fe es fuerte.");
+            dialogueQueue.add("Has derrotado a Jesucristo.");
+        } else if (npcName.equals("Afton")) {
+            aftonDefeated = true;
+            dialogueQueue = new LinkedList<>();
+            dialogueQueue.add("¡NO! ¡Esto es imposible!");
+            dialogueQueue.add("Has derrotado a Afton.");
         }
 
         currentState = GameState.DIALOGUE;
@@ -1592,6 +1954,17 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         } else if (mapPath.equals("Mapa/MAPA3.tmx")) {
             // --- LOGICA MAPA 3 (Coordinate-based spawning) ---
             for (String coord : VALID_COLLECTIBLE_COORDS_MAP3) {
+                String[] parts = coord.split(",");
+                int tileX = Integer.parseInt(parts[0]);
+                int tileY = Integer.parseInt(parts[1]);
+
+                float worldX = tileX * TILE_WIDTH * UNIT_SCALE;
+                float worldY = tileY * TILE_HEIGHT * UNIT_SCALE;
+                validSpawnPositions.add(new Float[] { worldX, worldY });
+            }
+        } else if (mapPath.equals("Mapa/MAPA 4.tmx")) {
+            // --- LOGICA MAPA 4 (Coordinate-based spawning) ---
+            for (String coord : VALID_COLLECTIBLE_COORDS_MAP4) {
                 String[] parts = coord.split(",");
                 int tileX = Integer.parseInt(parts[0]);
                 int tileY = Integer.parseInt(parts[1]);
@@ -2600,8 +2973,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private void startTransitionToPokemonCenter() {
         currentState = GameState.TRANSITIONING;
         transitionTimer = 0f;
-        nextScreen = new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
-                null, GameState.FREE_ROAMING, null, null, "Mapa/mapa11.tmx");
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, null, null, "Mapa/mapa11.tmx"));
         Gdx.input.setInputProcessor(null);
     }
 
@@ -2615,23 +2989,23 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             // the entrance)
             float returnX = 45f * 16f * UNIT_SCALE;
             float returnY = 27f * 16f * UNIT_SCALE;
-            ScreenMapaTiled map2Screen = new ScreenMapaTiled(game, "Mapa/Mapa2.tmx", playerInventory, playerPokemon,
-                    null, GameState.FREE_ROAMING, returnX, returnY);
-            nextScreen = map2Screen;
+            nextScreen = new ScreenCarga(game,
+                    () -> new ScreenMapaTiled(game, "Mapa/Mapa2.tmx", playerInventory, playerPokemon,
+                            null, GameState.FREE_ROAMING, returnX, returnY));
         } else if (sourceMapBeforePokemonCenter != null && sourceMapBeforePokemonCenter.equals("Mapa/MAPA3.tmx")) {
             // Return to Map 3 (Tile 25, 33 - one tile below entrance)
             float returnX = 25f * 16f * UNIT_SCALE;
             float returnY = 33f * 16f * UNIT_SCALE;
-            ScreenMapaTiled map3Screen = new ScreenMapaTiled(game, "Mapa/MAPA3.tmx", playerInventory, playerPokemon,
-                    null, GameState.FREE_ROAMING, returnX, returnY);
-            nextScreen = map3Screen;
+            nextScreen = new ScreenCarga(game,
+                    () -> new ScreenMapaTiled(game, "Mapa/MAPA3.tmx", playerInventory, playerPokemon,
+                            null, GameState.FREE_ROAMING, returnX, returnY));
         } else {
             // Return to Map 1 at the Pokemon Center entrance (tile 38, 36)
             float returnX = 38f * 16f * UNIT_SCALE;
             float returnY = 36f * 16f * UNIT_SCALE;
-            ScreenMapaTiled map1Screen = new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
-                    null, GameState.FREE_ROAMING, returnX, returnY);
-            nextScreen = map1Screen;
+            nextScreen = new ScreenCarga(game,
+                    () -> new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
+                            null, GameState.FREE_ROAMING, returnX, returnY));
         }
 
         Gdx.input.setInputProcessor(null);
@@ -2645,8 +3019,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         float spawnX = 48f * 16f * UNIT_SCALE;
         float spawnY = 26f * 16f * UNIT_SCALE;
 
-        nextScreen = new ScreenMapaTiled(game, "Mapa/Mapa2.tmx", playerInventory, playerPokemon,
-                null, GameState.FREE_ROAMING, spawnX, spawnY);
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/Mapa2.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, spawnX, spawnY));
         Gdx.input.setInputProcessor(null);
     }
 
@@ -2659,17 +3034,18 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         float returnX = 1f * 16f * UNIT_SCALE;
         float returnY = 19f * 16f * UNIT_SCALE;
 
-        ScreenMapaTiled map1Screen = new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
-                null, GameState.FREE_ROAMING, returnX, returnY);
-        nextScreen = map1Screen;
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, returnX, returnY));
         Gdx.input.setInputProcessor(null);
     }
 
     private void startTransitionToPokemonCenterFromMap2() {
         currentState = GameState.TRANSITIONING;
         transitionTimer = 0f;
-        nextScreen = new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
-                null, GameState.FREE_ROAMING, null, null, "Mapa/Mapa2.tmx");
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, null, null, "Mapa/Mapa2.tmx"));
         Gdx.input.setInputProcessor(null);
     }
 
@@ -2681,16 +3057,18 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         float spawnX = 1f * 16f * UNIT_SCALE;
         float spawnY = 23f * 16f * UNIT_SCALE;
 
-        nextScreen = new ScreenMapaTiled(game, "Mapa/MAPA3.tmx", playerInventory, playerPokemon,
-                null, GameState.FREE_ROAMING, spawnX, spawnY);
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/MAPA3.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, spawnX, spawnY));
         Gdx.input.setInputProcessor(null);
     }
 
     private void startTransitionToPokemonCenterFromMap3() {
         currentState = GameState.TRANSITIONING;
         transitionTimer = 0f;
-        nextScreen = new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
-                null, GameState.FREE_ROAMING, null, null, "Mapa/MAPA3.tmx");
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, null, null, "Mapa/MAPA3.tmx"));
         Gdx.input.setInputProcessor(null);
     }
 
@@ -2701,9 +3079,37 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         float returnX = 48f * 16f * UNIT_SCALE;
         float returnY = 23f * 16f * UNIT_SCALE;
 
-        ScreenMapaTiled map1Screen = new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
-                null, GameState.FREE_ROAMING, returnX, returnY);
-        nextScreen = map1Screen;
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, returnX, returnY));
+        Gdx.input.setInputProcessor(null);
+    }
+
+    private void startTransitionToMap4() {
+        currentState = GameState.TRANSITIONING;
+        transitionTimer = 0f;
+
+        // Aparecer en Mapa 4, Borde Inferior
+        float spawnX = 24.5f * 16f * UNIT_SCALE;
+        float spawnY = 1.5f * 16f * UNIT_SCALE;
+
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/MAPA 4.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, spawnX, spawnY));
+        Gdx.input.setInputProcessor(null);
+    }
+
+    private void startTransitionBackToMap1FromMap4() {
+        currentState = GameState.TRANSITIONING;
+        transitionTimer = 0f;
+
+        // Regresamos a Mapa 1 cerca de donde entramos (Borde Superior)
+        float spawnX = 24.5f * 16f * UNIT_SCALE;
+        float spawnY = 47.5f * 16f * UNIT_SCALE;
+
+        nextScreen = new ScreenCarga(game,
+                () -> new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
+                        null, GameState.FREE_ROAMING, spawnX, spawnY));
         Gdx.input.setInputProcessor(null);
     }
 
@@ -2780,6 +3186,19 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     Gdx.app.error("RENDER", "Error al reinicializar renderer: " + e2.getMessage(), e2);
                 }
             }
+
+            // Bonnie Animation (Map 3)
+            if (mapPath.equals("Mapa/MAPA 3.tmx")) {
+                if (bonnieActor != null && bonnieTexture1 != null && bonnieTexture2 != null) {
+                    bonnieAnimTimer += delta;
+                    if (bonnieAnimTimer >= 0.5f) {
+                        bonnieFrame1 = !bonnieFrame1;
+                        bonnieActor
+                                .setDrawable(new TextureRegionDrawable(bonnieFrame1 ? bonnieTexture1 : bonnieTexture2));
+                        bonnieAnimTimer = 0;
+                    }
+                }
+            }
         } else
 
         {
@@ -2820,6 +3239,17 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     kanekiAnimTimer = 0;
                 }
             }
+
+            // Freddy Map 2 animation
+            if (freddyMap2Actor != null && freddyMap2Texture1 != null && freddyMap2Texture2 != null) {
+                freddyMap2AnimTimer += delta;
+                if (freddyMap2AnimTimer >= 0.5f) {
+                    freddyMap2Frame1 = !freddyMap2Frame1;
+                    freddyMap2Actor.setDrawable(
+                            new TextureRegionDrawable(freddyMap2Frame1 ? freddyMap2Texture1 : freddyMap2Texture2));
+                    freddyMap2AnimTimer = 0;
+                }
+            }
         }
 
         // Animate Map 3 NPCs
@@ -2843,6 +3273,41 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     donValerioActor.setDrawable(
                             new TextureRegionDrawable(donValerioFrame1 ? donValerioTexture1 : donValerioTexture2));
                     donValerioAnimTimer = 0;
+                }
+            }
+        }
+
+        // Animate Map 4 NPCs
+        if (mapPath.equals("Mapa/MAPA 4.tmx")) {
+            // Jesucristo animation
+            if (jesucristoActor != null && jesucristoTexture1 != null && jesucristoTexture2 != null) {
+                jesucristoAnimTimer += delta;
+                if (jesucristoAnimTimer >= 0.5f) {
+                    jesucristoFrame1 = !jesucristoFrame1;
+                    jesucristoActor.setDrawable(
+                            new TextureRegionDrawable(jesucristoFrame1 ? jesucristoTexture1 : jesucristoTexture2));
+                    jesucristoAnimTimer = 0;
+                }
+            }
+
+            // Afton animation
+            if (aftonActor != null && aftonTexture1 != null && aftonTexture2 != null) {
+                aftonAnimTimer += delta;
+                if (aftonAnimTimer >= 0.5f) {
+                    aftonFrame1 = !aftonFrame1;
+                    aftonActor.setDrawable(new TextureRegionDrawable(aftonFrame1 ? aftonTexture1 : aftonTexture2));
+                    aftonAnimTimer = 0;
+                }
+            }
+
+            // Map 4 Info NPC animation
+            if (map4InfoNpcActor != null && map4InfoNpcTexture1 != null && map4InfoNpcTexture2 != null) {
+                map4InfoNpcAnimTimer += delta;
+                if (map4InfoNpcAnimTimer >= 0.5f) {
+                    map4InfoNpcFrame1 = !map4InfoNpcFrame1;
+                    map4InfoNpcActor.setDrawable(
+                            new TextureRegionDrawable(map4InfoNpcFrame1 ? map4InfoNpcTexture1 : map4InfoNpcTexture2));
+                    map4InfoNpcAnimTimer = 0;
                 }
             }
         }
@@ -3235,6 +3700,18 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             if (mapPath.equals("Mapa/MAPA3.tmx") && tileX == 0 && (tileY >= 22 && tileY <= 30)) {
                 Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 1 desde Mapa 3");
                 startTransitionBackToMap1FromMap3();
+            }
+
+            // Transición de Mapa 1 a Mapa 4 (Tiles 22-27, 49)
+            if (mapPath.equals("Mapa/mapa11.tmx") && tileY == 49 && (tileX >= 22 && tileX <= 27)) {
+                Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 4 desde X=" + tileX + ", Y=" + tileY);
+                startTransitionToMap4();
+            }
+
+            // Transición de Mapa 4 a Mapa 1 (Borde Inferior Y=0)
+            if (mapPath.equals("Mapa/MAPA 4.tmx") && tileY == 0 && (tileX >= 22 && tileX <= 27)) {
+                Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 1 desde Mapa 4");
+                startTransitionBackToMap1FromMap4();
             }
         }
     }
@@ -3752,6 +4229,21 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 int pTileY = (int) (playerCenterY
                         / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
 
+                // Freddy Map 2 Info at (29, 29)
+                if (Math.abs(pTileX - 29) <= 1 && Math.abs(pTileY - 29) <= 1) {
+                    dialogueQueue = new LinkedList<>();
+                    dialogueQueue.add("¡Hola! Soy Freddy.");
+                    dialogueQueue.add("Este lugar es el hogar de Pokémon de tipo Agua.");
+                    dialogueQueue.add("Podrás encontrar fácilmente a Oshawott.");
+                    dialogueQueue.add("También he visto a Vaporeon y Sylveon paseando por la hierba.");
+                    dialogueQueue.add("¡Ten cuidado! Un poderoso Blastoise protege esta zona.");
+                    dialogueQueue.add("Ah, y a veces aparece Jolteon, ¡es muy rápido!");
+
+                    currentState = GameState.DIALOGUE;
+                    processNextDialogueLine();
+                    return true;
+                }
+
                 // Giorno at (4, 51) - Jolteon
                 if (Math.abs(pTileX - 4) <= 1 && Math.abs(pTileY - 51) <= 1) {
                     if (!giornoDefeated) {
@@ -3823,6 +4315,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                         processNextDialogueLine();
 
                         onDialogCompleteAction = new Runnable() {
+
                             @Override
                             public void run() {
                                 startNPCBattle("Mewtwo", "Kaneki");
@@ -3841,6 +4334,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
             // --- MAP 3 NPCS ---
             if (mapPath.equals("Mapa/MAPA3.tmx")) {
+
                 int pTileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
                 int pTileY = (int) (playerCenterY
                         / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
@@ -3873,6 +4367,20 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     return true;
                 }
 
+                // Bonnie at (4, 28)
+                if (Math.abs(pTileX - 4) <= 1 && Math.abs(pTileY - 28) <= 1) {
+                    dialogueQueue = new LinkedList<>();
+                    dialogueQueue.add("¡Hola! ¿Has visto a los Pokémon de aquí?");
+                    dialogueQueue.add("Dicen que se pueden encontrar varias evoluciones de Eevee.");
+                    dialogueQueue.add("He visto a Vaporeon, Jolteon y Flareon merodeando.");
+                    dialogueQueue.add("¡También un Ivysaur suele aparecer por los jardines!");
+                    dialogueQueue.add("Buena suerte atrapándolos a todos.");
+
+                    currentState = GameState.DIALOGUE;
+                    processNextDialogueLine();
+                    return true;
+                }
+
                 // Don Valerio at (44, 30)
                 if (Math.abs(pTileX - 44) <= 1 && Math.abs(pTileY - 30) <= 1) {
                     if (!donValerioDefeated) {
@@ -3898,6 +4406,81 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                         currentState = GameState.DIALOGUE;
                         processNextDialogueLine();
                     }
+                    return true;
+                }
+            }
+
+            // --- MAP 4 NPCS ---
+            if (mapPath.equals("Mapa/MAPA 4.tmx")) {
+                int pTileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
+                int pTileY = (int) (playerCenterY
+                        / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
+
+                // Jesucristo at (2, 4)
+                if (Math.abs(pTileX - 2) <= 1 && Math.abs(pTileY - 4) <= 1) {
+                    if (!jesucristoDefeated) {
+                        dialogueQueue = new LinkedList<>();
+                        dialogueQueue.add("Hijo mío, has recorrido un largo camino.");
+                        dialogueQueue.add("Pero para alcanzar la salvación, debes probar tu fuerza.");
+                        dialogueQueue.add("¿Estás listo para enfrentar la luz?");
+
+                        currentState = GameState.DIALOGUE;
+                        processNextDialogueLine();
+
+                        onDialogCompleteAction = new Runnable() {
+                            @Override
+                            public void run() {
+                                startNPCBattle("Lucario", "Jesucristo");
+                            }
+                        };
+                    } else {
+                        dialogueQueue = new LinkedList<>();
+                        dialogueQueue.add("Ve en paz, hijo mío.");
+                        dialogueQueue.add("La luz siempre te acompañará.");
+                        currentState = GameState.DIALOGUE;
+                        processNextDialogueLine();
+                    }
+                    return true;
+                }
+
+                // Afton at (45, 4)
+                if (Math.abs(pTileX - 45) <= 1 && Math.abs(pTileY - 4) <= 1) {
+                    if (!aftonDefeated) {
+                        dialogueQueue = new LinkedList<>();
+                        dialogueQueue.add("No deberías estar aquí...");
+                        dialogueQueue.add("He vuelto... siempre vuelvo.");
+                        dialogueQueue.add("Ahora, tu alma será mía.");
+
+                        currentState = GameState.DIALOGUE;
+                        processNextDialogueLine();
+
+                        onDialogCompleteAction = new Runnable() {
+                            @Override
+                            public void run() {
+                                startNPCBattle("Mewtwo", "Afton");
+                            }
+                        };
+                    } else {
+                        dialogueQueue = new LinkedList<>();
+                        dialogueQueue.add("Volveré...");
+                        dialogueQueue.add("Siempre vuelvo...");
+                        currentState = GameState.DIALOGUE;
+                        processNextDialogueLine();
+                    }
+                    return true;
+                }
+
+                // Info NPC at (21, 12)
+                if (Math.abs(pTileX - 21) <= 1 && Math.abs(pTileY - 12) <= 1) {
+                    dialogueQueue = new LinkedList<>();
+                    dialogueQueue.add("¡Hola viajero! Este lugar es peligroso.");
+                    dialogueQueue.add("En estas tierras volcánicas aparecen Pokémon muy fuertes.");
+                    dialogueQueue.add("Podrás encontrar a Cyndaquil, Flareon y Charizard.");
+                    dialogueQueue.add("¡Incluso se dice que un Gyarados habita en las zonas de lava!");
+                    dialogueQueue.add("Ten mucho cuidado.");
+
+                    currentState = GameState.DIALOGUE;
+                    processNextDialogueLine();
                     return true;
                 }
             }

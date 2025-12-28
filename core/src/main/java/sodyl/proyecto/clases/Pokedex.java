@@ -182,49 +182,53 @@ public class Pokedex {
     }
 
     public static void save() {
-        Json json = new Json();
-        json.setOutputType(JsonWriter.OutputType.json);
-        PokedexData data = new PokedexData();
-        data.seen = seen;
-        data.collected = collected;
-        data.researchLevels = researchLevels;
-        data.team = team;
-        data.tutorialCompleted = tutorialCompleted;
+        // PERMANENCE DISABLED BY USER
+        // Json json = new Json();
+        // json.setOutputType(JsonWriter.OutputType.json);
+        // PokedexData data = new PokedexData();
+        // data.seen = seen;
+        // data.collected = collected;
+        // data.researchLevels = researchLevels;
+        // data.team = team;
+        // data.tutorialCompleted = tutorialCompleted;
 
-        FileHandle file = Gdx.files.local(getSaveFileName());
-        file.writeString(json.toJson(data), false);
+        // FileHandle file = Gdx.files.local(getSaveFileName());
+        // file.writeString(json.toJson(data), false);
+        Gdx.app.log("POKEDEX", "Save disabled (Session only)");
     }
 
     public static void load() {
-        FileHandle file = Gdx.files.local(getSaveFileName());
-        if (!file.exists())
-            return;
+        // PERMANENCE DISABLED BY USER
+        // FileHandle file = Gdx.files.local(getSaveFileName());
+        // if (!file.exists())
+        // return;
 
-        try {
-            Json json = new Json();
-            PokedexData data = json.fromJson(PokedexData.class, file.readString());
-            if (data != null) {
-                seen.clear();
-                if (data.seen != null)
-                    seen.addAll(data.seen);
+        // try {
+        // Json json = new Json();
+        // PokedexData data = json.fromJson(PokedexData.class, file.readString());
+        // if (data != null) {
+        // seen.clear();
+        // if (data.seen != null)
+        // seen.addAll(data.seen);
 
-                collected.clear();
-                if (data.collected != null)
-                    collected.addAll(data.collected);
+        // collected.clear();
+        // if (data.collected != null)
+        // collected.addAll(data.collected);
 
-                researchLevels.clear();
-                if (data.researchLevels != null)
-                    researchLevels.putAll(data.researchLevels);
+        // researchLevels.clear();
+        // if (data.researchLevels != null)
+        // researchLevels.putAll(data.researchLevels);
 
-                team.clear();
-                if (data.team != null)
-                    team.addAll(data.team);
+        // team.clear();
+        // if (data.team != null)
+        // team.addAll(data.team);
 
-                tutorialCompleted = data.tutorialCompleted;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        // tutorialCompleted = data.tutorialCompleted;
+        // }
+        // } catch (Exception e) {
+        // e.printStackTrace();
+        // }
+        Gdx.app.log("POKEDEX", "Load disabled (Starting fresh session)");
     }
 
     public static boolean isTutorialCompleted() {

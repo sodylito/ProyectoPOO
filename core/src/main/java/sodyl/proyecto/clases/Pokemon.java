@@ -4,8 +4,8 @@ public class Pokemon {
 
     private String especie;
     private TiposPokemon tipo;
-    private int baseHP; // este HP es el que tiene cada pokemón al capturarlo, la idea es que eso se
-                        // sume de alguna forma al nivel actual
+    private int baseHP; // este HP es el que tiene cada pokemón al capturarlo
+    private int growthHP; // Crecimiento de HP por nivel
     private TiposAtaque movimiento1; // igual que el HP, pero con el daño base que hace el movimiento
     private TiposAtaque movimiento2;
 
@@ -26,15 +26,17 @@ public class Pokemon {
     public Pokemon() {
     }
 
-    public Pokemon(String especie, TiposPokemon tipo, int baseHP, TiposAtaque movimiento1, TiposAtaque movimiento2) {
+    public Pokemon(String especie, TiposPokemon tipo, int baseHP, int growthHP, TiposAtaque movimiento1,
+            TiposAtaque movimiento2) {
         this.especie = especie;
         this.tipo = tipo;
         this.baseHP = baseHP;
+        this.growthHP = growthHP;
         this.movimiento1 = movimiento1;
         this.movimiento2 = movimiento2;
         this.nivel = 1;
 
-        this.maxHp = baseHP + (nivel * 5); // por los momentos, usaré estas formulas para ver si son viables
+        this.maxHp = baseHP + (nivel * growthHP);
         this.danoAtaque = movimiento1.danoBase + (nivel * 2);
         this.danoDefensa = movimiento2.danoBase + (nivel * 2);
         this.velocidad = 10 + (nivel * 2);
@@ -47,7 +49,7 @@ public class Pokemon {
 
     public void actualizarAtributos() { // esto lo creé porque no voy a usar el constructor otra vez, cada vez que se
                                         // haga un cambio en los atributos, se usará
-        this.maxHp = this.baseHP + (this.nivel * 5);
+        this.maxHp = this.baseHP + (this.nivel * this.growthHP);
         this.danoAtaque = this.movimiento1.danoBase + (this.nivel * 2);
         this.danoDefensa = this.movimiento2.danoBase + (this.nivel * 2);
         this.velocidad = 10 + (this.nivel * 2);
@@ -79,6 +81,10 @@ public class Pokemon {
 
     public int getBaseHP() {
         return baseHP;
+    }
+
+    public int getGrowthHP() {
+        return growthHP;
     }
 
     public TiposAtaque getMovimiento1() {
