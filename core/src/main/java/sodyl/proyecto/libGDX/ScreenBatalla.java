@@ -25,7 +25,6 @@ import sodyl.proyecto.clases.Inventario;
 import sodyl.proyecto.clases.Objeto;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
-import com.badlogic.gdx.math.Vector2;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
@@ -88,18 +87,24 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
     // Menu Options Labels
     private Label fightLabel, bagLabel, pokemonLabel, runLabel;
-    private Label move1Label, move2Label, cancelMoveLabel;
 
     // --- State Machine ---
+    // UNIDAD 9: PATRONES DE DISEÑO - STATE (Estado)
+    // El uso de un Enum para controlar el flujo de la batalla es una implementación
+    // simplificada del patrón State, donde el comportamiento de la pantalla
+    // (input/render)
+    // cambia totalmente según el estado actual.
     private enum BattleState {
         INTRO,
         MAIN_MENU,
         FIGHT_MENU,
         BAG_MENU,
         POKEMON_MENU,
-        MESSAGE_WAIT, // Esperando que el usuario presione Z/Enter para continuar texto
+        MESSAGE_WAIT,
         ENEMY_TURN,
-        BATTLE_END
+        BATTLE_END,
+        BAG_CAPTURE_MENU,
+        BAG_HEAL_MENU
     }
 
     private BattleState currentState = BattleState.INTRO;
@@ -107,7 +112,9 @@ public class ScreenBatalla implements Screen, InputProcessor {
     // Selection Indices
     private int mainMenuIndex = 0; // 0:Fight, 1:Bag, 2:Pokemon, 3:Run
     private int fightMenuIndex = 0; // 0:Move1, 1:Move2, 2:Cancel
-    private int bagMenuIndex = 0; // 0:Capture, 1:Heal, 2:Cancel
+    private int bagMenuIndex = 0; // 0:Capture, 1:Heal, 2:PowerUp, 3:Cancel
+    private int bagCaptureMenuIndex = 0; // 0:Pokeball, 1:Masterball, 2:Cancel
+    private int bagHealMenuIndex = 0; // 0:Potion, 1:SuperPotion, 2:Cancel
     private int pokemonMenuIndex = 0; // Index for team selection
 
     private float animationTimer = 0f;
@@ -130,19 +137,21 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
     public ScreenBatalla(Proyecto game, ScreenMapaTiled previousScreen, Pokemon pokemonJugador, Pokemon pokemonEnemigo,
             Inventario inventario) {
-        this(game, previousScreen, pokemonJugador, pokemonEnemigo, inventario, false, false, "Mapa/mapa11.tmx", false);
+        this(game, previousScreen, pokemonJugador, pokemonEnemigo, inventario, false, false, "Mapa/MAPACOMPLETO.tmx",
+                false);
     }
 
     public ScreenBatalla(Proyecto game, ScreenMapaTiled previousScreen, Pokemon pokemonJugador, Pokemon pokemonEnemigo,
             Inventario inventario, boolean isTutorial) {
-        this(game, previousScreen, pokemonJugador, pokemonEnemigo, inventario, isTutorial, false, "Mapa/mapa11.tmx",
+        this(game, previousScreen, pokemonJugador, pokemonEnemigo, inventario, isTutorial, false,
+                "Mapa/MAPACOMPLETO.tmx",
                 false);
     }
 
     public ScreenBatalla(Proyecto game, ScreenMapaTiled previousScreen, Pokemon pokemonJugador, Pokemon pokemonEnemigo,
             Inventario inventario, boolean isTutorial, boolean isFinalBattle) {
         this(game, previousScreen, pokemonJugador, pokemonEnemigo, inventario, isTutorial, isFinalBattle,
-                "Mapa/mapa11.tmx", false);
+                "Mapa/MAPACOMPLETO.tmx", false);
     }
 
     public ScreenBatalla(Proyecto game, ScreenMapaTiled previousScreen, Pokemon pokemonJugador, Pokemon pokemonEnemigo,
@@ -164,6 +173,10 @@ public class ScreenBatalla implements Screen, InputProcessor {
                 customBackgroundPath, false);
     }
 
+    // UNIDAD 3: SOBRE CARGA DE CONSTRUCTORES (Constructor Overloading)
+    // Tenemos múltiples versiones del mismo constructor con diferentes parámetros.
+    // Esto permite crear la pantalla de batalla con diferentes configuraciones
+    // (si es tutorial, si es batalla final, etc.), demostrando flexibilidad.
     public ScreenBatalla(Proyecto game, ScreenMapaTiled previousScreen, Pokemon pokemonJugador, Pokemon pokemonEnemigo,
             Inventario inventario, boolean isTutorial, boolean isFinalBattle, String mapPath,
             String customBackgroundPath, boolean isNPCBattle) {
@@ -219,11 +232,8 @@ public class ScreenBatalla implements Screen, InputProcessor {
                 // Custom background takes precedence over mapPath logic
                 bgPath = customBackgroundPath;
             } else if (mapPath != null) {
-                if (mapPath.contains("mapa11")) {
+                if (mapPath.contains("MAPACOMPLETO")) {
                     bgPath = "Mapa/fondoBatalla.jpg";
-                } else if (mapPath.contains("Mapa2")) {
-                    bgPath = "Mapa/fondoBatalla2.png.png"; // Note: User file list showed .png.png double extension,
-                                                           // verifying correctness
                 }
             }
 
@@ -236,7 +246,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
             backgroundTexture = new Texture(Gdx.files.internal(bgPath));
         } catch (Exception e) {
-            Gdx.app.error("ScreenBatalla", "Background not found: " + e.getMessage());
+            Gdx.app.error("ScreenBatalla", "Fondo no encontrado: " + e.getMessage());
             backgroundTexture = createPlaceholderTexture(new Color(0.2f, 0.3f, 0.5f, 1f));
         }
 
@@ -415,14 +425,41 @@ public class ScreenBatalla implements Screen, InputProcessor {
             optionsTable.setVisible(true);
             messageLabel.setText("Elige una acción:");
 
-            fightLabel.setText("CAPTURAR");
-            bagLabel.setText("CURAR"); // Placeholder
-            pokemonLabel.setText("---");
+            fightLabel.setText(isNPCBattle ? "---" : "CAPTURAR");
+            bagLabel.setText("CURAR");
+            pokemonLabel.setText("POTENCIAR");
             runLabel.setText("ATRÁS");
 
             fightLabel.setColor(bagMenuIndex == 0 ? Color.RED : Color.GRAY);
             bagLabel.setColor(bagMenuIndex == 1 ? Color.GREEN : Color.GRAY);
+            pokemonLabel.setColor(bagMenuIndex == 2 ? Color.ORANGE : Color.GRAY);
             runLabel.setColor(bagMenuIndex == 3 ? Color.YELLOW : Color.GRAY);
+
+        } else if (currentState == BattleState.BAG_CAPTURE_MENU) {
+            optionsTable.setVisible(true);
+            messageLabel.setText("Elige una Pokéball:");
+
+            fightLabel.setText("POKEBALL"); // ID 101
+            bagLabel.setText("MASTERBALL"); // ID 106
+            pokemonLabel.setText("---");
+            runLabel.setText("ATRÁS");
+
+            fightLabel.setColor(bagCaptureMenuIndex == 0 ? Color.RED : Color.GRAY);
+            bagLabel.setColor(bagCaptureMenuIndex == 1 ? Color.MAGENTA : Color.GRAY);
+            runLabel.setColor(bagCaptureMenuIndex == 3 ? Color.YELLOW : Color.GRAY);
+
+        } else if (currentState == BattleState.BAG_HEAL_MENU) {
+            optionsTable.setVisible(true);
+            messageLabel.setText("Elige una Poción:");
+
+            fightLabel.setText("POCIÓN"); // ID 103
+            bagLabel.setText("SUPERPOCIÓN"); // ID 104
+            pokemonLabel.setText("---");
+            runLabel.setText("ATRÁS");
+
+            fightLabel.setColor(bagHealMenuIndex == 0 ? Color.GREEN : Color.GRAY);
+            bagLabel.setColor(bagHealMenuIndex == 1 ? Color.CYAN : Color.GRAY);
+            runLabel.setColor(bagHealMenuIndex == 3 ? Color.YELLOW : Color.GRAY);
 
         } else if (currentState == BattleState.POKEMON_MENU) {
             optionsTable.setVisible(true);
@@ -485,6 +522,10 @@ public class ScreenBatalla implements Screen, InputProcessor {
             handleFightMenuInput(keycode);
         } else if (currentState == BattleState.BAG_MENU) {
             handleBagMenuInput(keycode);
+        } else if (currentState == BattleState.BAG_CAPTURE_MENU) {
+            handleBagCaptureMenuInput(keycode);
+        } else if (currentState == BattleState.BAG_HEAL_MENU) {
+            handleBagHealMenuInput(keycode);
         } else if (currentState == BattleState.POKEMON_MENU) {
             handlePokemonMenuInput(keycode);
         }
@@ -632,49 +673,133 @@ public class ScreenBatalla implements Screen, InputProcessor {
         }
 
         if (keycode == Keys.Z || keycode == Keys.ENTER) {
-            if (bagMenuIndex == 3) { // ATRAS
-                currentState = BattleState.MAIN_MENU;
-            } else if (bagMenuIndex == 0) { // CAPTURAR
-                attemptCapture();
+            if (bagMenuIndex == 0) { // CAPTURAR
+                if (isNPCBattle) {
+                    showMessage("¡No puedes capturar el Pokémon de otro entrenador!", () -> {
+                        currentState = BattleState.BAG_MENU;
+                        updateMenuVisuals();
+                    });
+                    return;
+                }
+                currentState = BattleState.BAG_CAPTURE_MENU;
+                bagCaptureMenuIndex = 0;
             } else if (bagMenuIndex == 1) { // CURAR
-                // Check if player has potions (ID 103)
-                if (inventario.getQuantity(103) <= 0) {
-                    showMessage("¡No tienes pociones!", () -> {
+                currentState = BattleState.BAG_HEAL_MENU;
+                bagHealMenuIndex = 0;
+            } else if (bagMenuIndex == 2) { // POTENCIAR
+                if (inventario.getQuantity(105) <= 0) {
+                    showMessage("¡No tienes Piedras Potenciadoras!", () -> {
                         currentState = BattleState.BAG_MENU;
                         updateMenuVisuals();
                     });
                     return;
                 }
-
-                Pokemon player = batalla.getPokemonJugador();
-
-                // Check if Pokemon is already at full HP
-                if (player.getActualHP() >= player.getMaxHp()) {
-                    showMessage("¡" + player.getEspecie() + " ya tiene toda su vida!", () -> {
-                        currentState = BattleState.BAG_MENU;
-                        updateMenuVisuals();
-                    });
-                    return;
-                }
-
-                // Use potion
-                inventario.removeObjeto(103, 1);
-                int healAmount = 20; // Poción restaura 20 HP según Objeto.java
-                int oldHP = player.getActualHP();
-                player.setActualHP(Math.min(player.getActualHP() + healAmount, player.getMaxHp()));
-                int actualHealed = player.getActualHP() - oldHP;
-
-                // Trigger green flash effect
-                triggerFlash(new Color(0f, 1f, 0f, 0.7f), () -> {
-                    updateInfoLabels();
-                    showMessage("¡" + player.getEspecie() + " recuperó " + actualHealed + " HP!", () -> {
-                        // Healing takes a turn, enemy attacks
+                inventario.removeObjeto(105, 1);
+                batalla.activatePowerUp();
+                triggerFlash(Color.ORANGE, () -> {
+                    showMessage("¡Daño aumentado en un 50%!", () -> {
                         startEnemyTurn();
                     });
                 });
+            } else if (bagMenuIndex == 3) { // ATRÁS
+                currentState = BattleState.MAIN_MENU;
             }
         }
         updateMenuVisuals();
+    }
+
+    private void handleBagCaptureMenuInput(int keycode) {
+        if (keycode == Keys.UP && bagCaptureMenuIndex >= 2)
+            bagCaptureMenuIndex -= 2;
+        if (keycode == Keys.DOWN && bagCaptureMenuIndex <= 1)
+            bagCaptureMenuIndex += 2;
+        if (keycode == Keys.LEFT && (bagCaptureMenuIndex % 2) != 0)
+            bagCaptureMenuIndex--;
+        if (keycode == Keys.RIGHT && (bagCaptureMenuIndex % 2) == 0)
+            bagCaptureMenuIndex++;
+
+        if (keycode == Keys.X || keycode == Keys.ESCAPE) {
+            currentState = BattleState.BAG_MENU;
+            updateMenuVisuals();
+            return;
+        }
+
+        if (keycode == Keys.Z || keycode == Keys.ENTER) {
+            if (bagCaptureMenuIndex == 0) { // POKEBALL
+                attemptCapture(101);
+            } else if (bagCaptureMenuIndex == 1) { // MASTERBALL
+                attemptCapture(106);
+            } else if (bagCaptureMenuIndex == 3) { // ATRÁS
+                currentState = BattleState.BAG_MENU;
+            }
+        }
+        updateMenuVisuals();
+    }
+
+    private void handleBagHealMenuInput(int keycode) {
+        if (keycode == Keys.UP && bagHealMenuIndex >= 2)
+            bagHealMenuIndex -= 2;
+        if (keycode == Keys.DOWN && bagHealMenuIndex <= 1)
+            bagHealMenuIndex += 2;
+        if (keycode == Keys.LEFT && (bagHealMenuIndex % 2) != 0)
+            bagHealMenuIndex--;
+        if (keycode == Keys.RIGHT && (bagHealMenuIndex % 2) == 0)
+            bagHealMenuIndex++;
+
+        if (keycode == Keys.X || keycode == Keys.ESCAPE) {
+            currentState = BattleState.BAG_MENU;
+            updateMenuVisuals();
+            return;
+        }
+
+        if (keycode == Keys.Z || keycode == Keys.ENTER) {
+            if (bagHealMenuIndex == 0) { // POCIÓN
+                useHealItem(103, 20);
+            } else if (bagHealMenuIndex == 1) { // SUPERPOCIÓN
+                useHealItem(104, 50);
+            } else if (bagHealMenuIndex == 3) { // ATRÁS
+                currentState = BattleState.BAG_MENU;
+            }
+        }
+        updateMenuVisuals();
+    }
+
+    private void useHealItem(int itemId, int healAmount) {
+        Objeto item = Objeto.getObjeto(itemId);
+        if (inventario.getQuantity(itemId) <= 0) {
+            showMessage("¡No tienes " + item.getNombre() + "!", () -> {
+                currentState = BattleState.BAG_HEAL_MENU;
+                updateMenuVisuals();
+            });
+            return;
+        }
+
+        Pokemon player = batalla.getPokemonJugador();
+
+        // Check if Pokemon is already at full HP
+        if (player.getActualHP() >= player.getMaxHp()) {
+            showMessage("¡" + player.getEspecie() + " ya tiene toda su vida!", () -> {
+                currentState = BattleState.BAG_HEAL_MENU;
+                updateMenuVisuals();
+            });
+            return;
+        }
+
+        // Use item
+        inventario.removeObjeto(itemId, 1);
+        int oldHP = player.getActualHP();
+        player.setActualHP(Math.min(player.getActualHP() + healAmount, player.getMaxHp()));
+        int actualHealed = player.getActualHP() - oldHP;
+
+        // Trigger green flash effect
+        triggerFlash(new Color(0f, 1f, 0f, 0.7f), () -> {
+            updateInfoLabels();
+            showMessage(
+                    "¡" + player.getEspecie() + " recuperó " + actualHealed + " PS usando " + item.getNombre() + "!",
+                    () -> {
+                        startEnemyTurn();
+                    });
+        });
     }
 
     // --- BATTLE LOGIC ---
@@ -899,7 +1024,15 @@ public class ScreenBatalla implements Screen, InputProcessor {
                 Objeto rewardObj = Objeto.getObjeto(rewardId);
                 inventario.addObjeto(rewardId, 1);
 
-                showMessage("¡" + fainted.getEspecie() + " se debilitó! (+1 Inv. y " + rewardObj.getNombre() + ")",
+                // LVL Logic: +1 to winner
+                Pokemon winner = batalla.getPokemonJugador();
+                int oldLevel = winner.getNivel();
+                winner.setNivel(oldLevel + 1);
+                winner.actualizarAtributos();
+                String lvlMsg = (winner.getNivel() > oldLevel) ? " ¡Subió a Nv." + winner.getNivel() + "!" : "";
+
+                showMessage(
+                        "¡" + fainted.getEspecie() + " se debilitó! (+1 Inv. y " + rewardObj.getNombre() + ")" + lvlMsg,
                         () -> {
                             showMessage("¡Ganaste la batalla!", this::returnToMap);
                         });
@@ -913,20 +1046,28 @@ public class ScreenBatalla implements Screen, InputProcessor {
         stateTimer = 0f;
     }
 
-    private void attemptCapture() {
-        if (inventario.getQuantity(101) <= 0) {
-            showMessage("¡No tienes Pokéballs!", () -> {
+    private void attemptCapture(int itemId) {
+        if (isNPCBattle) {
+            showMessage("¡No puedes capturar el Pokémon de otro entrenador!", () -> {
                 currentState = BattleState.BAG_MENU;
                 updateMenuVisuals();
             });
             return;
         }
+        if (inventario.getQuantity(itemId) <= 0) {
+            String itemName = (itemId == 106) ? "Masterballs" : "Pokéballs";
+            showMessage("¡No tienes " + itemName + "!", () -> {
+                currentState = BattleState.BAG_CAPTURE_MENU;
+                updateMenuVisuals();
+            });
+            return;
+        }
 
-        inventario.removeObjeto(101, 1);
+        // Trigger capture flash
+        Color flashColor = (itemId == 106) ? Color.MAGENTA : new Color(1f, 0.65f, 0f, 0.8f);
 
-        // Trigger orange flash effect before capture attempt
-        triggerFlash(new Color(1f, 0.65f, 0f, 0.8f), () -> {
-            boolean captured = batalla.intentarCaptura();
+        triggerFlash(flashColor, () -> {
+            boolean captured = batalla.intentarCaptura(itemId);
 
             if (captured) {
                 // addCollected already adds +2 research points internally
@@ -942,17 +1083,39 @@ public class ScreenBatalla implements Screen, InputProcessor {
                         showMessage("¡Investigación completada! ¡Has dominado el juego!", this::returnToMap);
                     });
                 } else {
-                    showMessage("¡" + batalla.getPokemonEnemigo().getEspecie() + " capturado! (+2 Inv.)",
+                    // Winner +1 level
+                    Pokemon winner = batalla.getPokemonJugador();
+                    int oldLvl = winner.getNivel();
+                    winner.setNivel(oldLvl + 1);
+                    winner.actualizarAtributos();
+                    String winnerLvlMsg = (winner.getNivel() > oldLvl) ? " (+1 Nivel para " + winner.getEspecie() + ")"
+                            : "";
+
+                    showMessage("¡" + batalla.getPokemonEnemigo().getEspecie() + " capturado! (+2 Inv.)" + winnerLvlMsg,
                             this::returnToMap);
                 }
             } else {
-                showMessage("¡El Pokémon escapó!", this::startEnemyTurn);
+                String failureMsg = "¡El Pokémon escapó! (Demasiada vida)";
+                if (itemId == 101 && batalla.getPokemonEnemigo().getEspecie().equalsIgnoreCase("Arceus")) {
+                    failureMsg = "¡La Pokéball es inútil contra Arceus!";
+                } else if (itemId == 106) {
+                    failureMsg = "¡La MasterBall falló! (Rival con demasiada vida)";
+                }
+                showMessage(failureMsg, this::startEnemyTurn);
             }
         });
     }
 
     private void returnToMap() {
         if (previousScreen != null) {
+            // Check if player won an NPC battle
+            if (isNPCBattle && batalla.getPokemonEnemigo().getActualHP() <= 0) {
+                previousScreen.onNPCBattleVictory(previousScreen.getCurrentBattleNPC());
+                game.setScreen(previousScreen);
+                return;
+            }
+
+            previousScreen.clearCurrentBattleNPC();
             previousScreen.currentState = ScreenMapaTiled.GameState.FREE_ROAMING;
             previousScreen.canTriggerEncounter = false;
             previousScreen.encounterCooldown = 0f;
@@ -1343,7 +1506,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
             }
 
         } catch (Exception e) {
-            Gdx.app.error("ScreenBatalla", "Sprite not found/Error loading: " + path + " - " + e.getMessage());
+            Gdx.app.error("ScreenBatalla", "Sprite no encontrado/Error al cargar: " + path + " - " + e.getMessage());
             if (isPlayer)
                 pokemonPlayerTexture = createPlaceholderTexture(Color.BLUE);
             else

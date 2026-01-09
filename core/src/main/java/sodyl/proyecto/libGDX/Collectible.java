@@ -12,13 +12,20 @@ import com.badlogic.gdx.utils.Disposable;
  * Representa un objeto interactivo en el mundo del juego que el jugador puede
  * recolectar.
  */
+// UNIDAD 2: HERENCIA / IMPLEMENTACIÓN
+// Collectible implementa 'Disposable', adquiriendo la responsabilidad de
+// liberar recursos.
+// En un diseño más complejo, esta podría ser una Clase Abstracta si tuviéramos
+// diferentes tipos de recolectables con comportamientos distintos.
 public class Collectible implements Disposable {
 
     private int itemId;
     private int quantity;
     private float x;
     private float y;
+    private int networkId = -1; // -1 for local-only, otherwise server provided
     private boolean isCollected;
+    private long collectionTime = 0; // Timestamp in milliseconds
     private Image actor;
     private Texture texture;
     private static final float INTERACTION_RANGE = 2.0f; // Radio de interacción
@@ -33,10 +40,15 @@ public class Collectible implements Disposable {
      * @param texturePath Ruta de la textura del icono.
      */
     public Collectible(float x, float y, int itemId, int quantity, String texturePath) {
+        this(x, y, itemId, quantity, texturePath, -1);
+    }
+
+    public Collectible(float x, float y, int itemId, int quantity, String texturePath, int networkId) {
         this.x = x;
         this.y = y;
         this.itemId = itemId;
         this.quantity = quantity;
+        this.networkId = networkId;
         this.isCollected = false;
 
         this.texture = new Texture(Gdx.files.internal(texturePath));
@@ -68,8 +80,15 @@ public class Collectible implements Disposable {
     public void setCollected(boolean isCollected) {
         this.isCollected = isCollected;
         if (isCollected) {
+            this.collectionTime = System.currentTimeMillis();
             this.actor.remove(); // Quitar del escenario
+        } else {
+            this.collectionTime = 0;
         }
+    }
+
+    public long getCollectionTime() {
+        return collectionTime;
     }
 
     public int getQuantity() {
@@ -78,6 +97,10 @@ public class Collectible implements Disposable {
 
     public Actor getActor() {
         return actor;
+    }
+
+    public int getNetworkId() {
+        return networkId;
     }
 
     /**
@@ -110,6 +133,9 @@ public class Collectible implements Disposable {
         return -1; // Ya recolectado
     }
 
+    // UNIDAD 3: SOBRE ESCRITURA (Override)
+    // Redefinimos el método dispose() de la interfaz Disposable para nuestros
+    // propios recursos.
     @Override
     public void dispose() {
         if (texture != null) {

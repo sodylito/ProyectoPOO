@@ -35,6 +35,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
@@ -49,6 +51,11 @@ import sodyl.proyecto.clases.Pokemon;
 import sodyl.proyecto.clases.Pokemones;
 // ASUME la existencia de la clase Collectible
 // ----------------------------------------------------
+import sodyl.proyecto.networking.ConexionCliente;
+import sodyl.proyecto.clases.PlayerData;
+import com.badlogic.gdx.utils.Json;
+import com.badlogic.gdx.utils.JsonValue;
+import com.badlogic.gdx.utils.JsonReader;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -66,269 +73,112 @@ import static com.badlogic.gdx.Input.Keys;
 
 public class ScreenMapaTiled implements Screen, InputProcessor {
 
-    private final Proyecto game;
+    protected final Proyecto game;
     private final String initialPokemonName; // si no es null, se usa para inicializar playerPokemon
-    private Stage stage;
+    protected Stage stage;
     public Stage uiStage; // public para acceso desde ScreenBatalla
-    private OrthographicCamera camera;
+    protected OrthographicCamera camera;
 
-    private SpriteBatch batch;
-    private TextureAtlas atlas;
-    private float stateTime;
-    private Animation<TextureRegion> walkDownAnimation;
-    private Animation<TextureRegion> walkUpAnimation;
-    private Animation<TextureRegion> walkLeftAnimation;
-    private Animation<TextureRegion> walkRightAnimation;
+    // --- NETWORKING ---
+    private ConexionCliente conexion;
+    private boolean isMultiplayer = false;
+    private Map<String, OtherPlayer> otherPlayers = new HashMap<>();
+    private float syncTimer = 0;
+    private static final float SYNC_INTERVAL = 0.05f; // Enviar posición cada 50ms
 
-    private enum Direction {
+    // Inner class to represent other players in the game
+    private class OtherPlayer {
+        Image actor;
+
+        public OtherPlayer(String id, float x, float y, Direction direction, boolean isMoving) {
+            // Create actor for this player
+            TextureRegion frame = walkDownAnimation.getKeyFrame(0);
+            this.actor = new Image(frame);
+            this.actor.setSize(2f, 2f);
+            this.actor.setPosition(x, y);
+            stage.addActor(this.actor);
+        }
+
+        public void update(float x, float y, Direction direction, boolean isMoving) {
+            this.actor.setPosition(x, y);
+            TextureRegion currentFrame = null;
+
+            if (isMoving) {
+                // UNIDAD 3: POLIMORFISMO DE SUBTIPOS Y ENUMERACIONES
+                // El comportamiento cambia según la dirección, demostrando cómo
+                // una lógica centralizada puede gestionar diferentes estados.
+                switch (direction) {
+                    case UP:
+                        currentFrame = walkUpAnimation.getKeyFrame(stateTime, true);
+                        break;
+                    case DOWN:
+                        currentFrame = walkDownAnimation.getKeyFrame(stateTime, true);
+                        break;
+                    case LEFT:
+                        currentFrame = walkLeftAnimation.getKeyFrame(stateTime, true);
+                        break;
+                    case RIGHT:
+                        currentFrame = walkRightAnimation.getKeyFrame(stateTime, true);
+                        break;
+                    default:
+                        currentFrame = walkDownAnimation.getKeyFrame(stateTime, true);
+                        break;
+                }
+            } else {
+                switch (direction) {
+                    case UP:
+                        currentFrame = walkUpAnimation.getKeyFrame(0);
+                        break;
+                    case DOWN:
+                        currentFrame = walkDownAnimation.getKeyFrame(0);
+                        break;
+                    case LEFT:
+                        currentFrame = walkLeftAnimation.getKeyFrame(0);
+                        break;
+                    case RIGHT:
+                        currentFrame = walkRightAnimation.getKeyFrame(0);
+                        break;
+                    default:
+                        currentFrame = walkDownAnimation.getKeyFrame(0);
+                        break;
+                }
+            }
+            this.actor.setDrawable(new TextureRegionDrawable(currentFrame));
+        }
+
+        public void remove() {
+            if (actor != null)
+                actor.remove();
+        }
+    }
+
+    protected SpriteBatch batch;
+    protected TextureAtlas atlas;
+    protected float stateTime;
+    protected Animation<TextureRegion> walkDownAnimation;
+    protected Animation<TextureRegion> walkUpAnimation;
+    protected Animation<TextureRegion> walkLeftAnimation;
+    protected Animation<TextureRegion> walkRightAnimation;
+
+    protected enum Direction {
         DOWN, UP, LEFT, RIGHT
     }
 
-    private Direction lastDirection = Direction.DOWN;
-    private Image characterActor;
-    // Map 3 NPCs
-    private Image pennywiseActor, donValerioActor;
-    private Texture pennywiseTexture1, pennywiseTexture2, donValerioTexture1, donValerioTexture2;
-    private boolean pennywiseDefeated = false, donValerioDefeated = false;
-    private float pennywiseAnimTimer = 0, donValerioAnimTimer = 0;
-    private boolean pennywiseFrame1 = true, donValerioFrame1 = true;
-    // Map 4 Info NPC
-    private Texture map4InfoNpcTexture1, map4InfoNpcTexture2;
-    private Image map4InfoNpcActor;
-    private boolean map4InfoNpcFrame1 = true;
-    private float map4InfoNpcAnimTimer = 0;
+    protected Direction lastDirection = Direction.DOWN;
+    protected Image characterActor;
 
-    // Map 2 Info NPC (Freddy)
-    private Texture freddyMap2Texture1, freddyMap2Texture2;
-    private Image freddyMap2Actor;
-    private boolean freddyMap2Frame1 = true;
-    private float freddyMap2AnimTimer = 0;
+    protected static final float SPEED = 150f;
+    protected boolean movingUp, movingDown, movingLeft, movingRight;
+    protected static final float UNIT_SCALE = 1 / 8f;
 
-    // Map 3 Info NPC (Bonnie)
-    private Texture bonnieTexture1, bonnieTexture2;
-    private Image bonnieActor;
-    private boolean bonnieFrame1 = true;
-    private float bonnieAnimTimer = 0;
+    protected TiledMap map;
+    protected OrthogonalTiledMapRenderer renderer;
+    protected int mapWidthTiles;
+    protected int mapHeightTiles;
 
-    private static final float SPEED = 80f;
-    private boolean movingUp, movingDown, movingLeft, movingRight;
-    private static final float UNIT_SCALE = 1 / 8f;
-
-    private TiledMap map;
-    private OrthogonalTiledMapRenderer renderer;
-    private int mapWidthTiles;
-    private int mapHeightTiles;
-
-    private Array<Rectangle> collisionRects;
+    protected Array<Rectangle> collisionRects;
     private static final String COLLISION_LAYER_NAME = "Capa de Objetos 1";
     private static final float COLLISION_PADDING = 0.1f;
-    // Listado de Tile IDs para APARICIÓN DE POKÉMON en Mapa 2
-    private static final Set<Integer> VALID_POKEMON_TILES_MAP2 = Set.of(
-            1033, 522, 778, 1034, 1290, 1546, 523, 1035, 2571, 1292, 524, 780, 1036, 1548, 2060, 2316, 2572, 525, 1549,
-            1805, 526, 2574, 527, 2575, 528, 2576, 529, 2577, 530, 2578, 2834, 531, 2579, 2835, 532, 2580, 2836, 533,
-            2581, 2837, 534, 2582, 2838, 535, 2583, 2839, 536, 2584, 2840, 537, 2585, 2841, 538, 2586, 2842, 2843, 539,
-            2587, 540, 2588, 2844, 1565, 2333, 2589, 1821, 541, 797, 2845, 2077, 1309, 1053, 1566, 542, 1310, 798, 1311,
-            543, 799, 1312, 1056, 544, 1057, 545, 1058, 802, 546, 547, 548, 549, 550, 649, 906, 1162, 1418, 1419, 1163,
-            907, 651, 908, 1164, 652, 1420, 1932, 2188, 2444, 653, 1677, 1933, 2701, 654, 2702, 2703, 2704, 2706, 1437,
-            1949, 2205, 1693, 2717, 2461, 1181, 925, 413, 669, 1182, 670, 414, 1439, 671, 1184, 673, 929, 930, 674, 675,
-            676, 677, 678, 679, 8587, 8459, 8331, 8332, 8460, 8589, 8333, 8461, 8590, 8334, 8462, 8591, 8335, 8463,
-            8592, 8336, 8464, 8593, 8337, 8465, 8594, 8338, 8466, 8595, 8339, 8467, 8596, 8340, 8468, 8597, 8341,
-            8469, 8598, 8342, 8470, 8343, 8471, 8599);
-
-    // Listado de Tile IDs para APARICIÓN DE OBJETOS en Mapa 2
-    private static final Set<Integer> VALID_COLLECTIBLE_TILES_MAP2 = Set.of(
-            2820, 3076, 3332, 2821, 3077, 3333, 2822, 3078, 3334, 2823, 3079, 3335, 5383, 6152, 3338, 3339, 5899, 5644,
-            3341, 5901, 5389, 3342, 5134, 3343, 5647, 3344, 5648, 5904, 3345, 3347, 3348, 6680, 6936, 7192, 7704, 5912,
-            3609, 5401, 4890, 4634, 3610, 4378, 4122, 4891, 5147, 4635, 3355, 3867, 4123, 4379, 5148, 4892, 3356, 3868,
-            4124, 4380, 4636, 4893, 5149, 3869, 3613, 4125, 4637, 3360, 5933, 2692, 2948, 3204, 2949, 3205, 3461, 2950,
-            3206, 2951, 3207, 5511, 4999, 3208, 5000, 3209, 5001, 3210, 5002, 6283, 5771, 5003, 3212, 6284, 5516, 3213,
-            6285, 5261, 5005, 3214, 5006, 3215, 6031, 5007, 3216, 6032, 5776, 3217, 3218, 3219, 3221, 3222, 3223, 6808,
-            7576, 3224, 5016, 6040, 7833, 3225, 3737, 5529, 4250, 4762, 5018, 5274, 5530, 3226, 3738, 3994, 4506, 4251,
-            5019, 4763, 4507, 5275, 5531, 5787, 3227, 3739, 3995, 4764, 5020, 5276, 5532, 4252, 4508, 4765, 3741, 3997,
-            4509, 5021, 5277, 5533, 7837, 3485, 3486, 3487, 3231, 3488, 3232,
-            // Nuevos tiles agregados
-            5642, 5649, 5905, 5651, 5653, 5654, 3351, 5656, 3612, 5150, 5407, 5663, 5919, 6175, 3359, 5408, 6176, 5153,
-            5409, 6177, 5410, 5154, 6179, 5156, 5412, 5413, 5157, 5158, 5414, 3111, 2855, 5415, 5159, 6183, 3624, 3368,
-            3112, 2600, 5160, 5416, 6184, 5417, 4137, 3625, 6185, 5418, 4394, 4138, 6186, 5163, 4907, 4651, 4395, 4139,
-            6188, 5932, 4396, 3884, 5165, 5166, 5934, 2862, 3374, 3630, 5935, 5167, 6192, 5169, 5768, 5514, 6027, 6028,
-            6029, 6033, 3478, 3740, 3484, 5278, 5023, 6047, 6304, 5536, 5280, 6305, 5281, 5537, 5025, 6306, 5538, 5282,
-            5539, 6308, 5284, 5541, 5285, 5029, 5286, 5542, 3239, 2727, 5543, 5031, 3496, 2984, 2728, 5288, 5544, 5289,
-            4265, 4009, 3753, 5290, 4010, 5291, 5035, 5547, 4779, 4523, 4011, 2475, 2221, 2733, 4013, 3757, 5806, 6062,
-            2734, 2990, 3246, 3502, 4014, 5807, 6063, 6064, 6576);
-
-    // Coordenadas de spawn para MAPA3 (X,Y)
-    private static final Set<String> VALID_SPAWN_COORDS_MAP3 = new HashSet<>(Arrays.asList(
-            "1,18", "2,18", "3,18", "4,18", "5,18", "6,18", "7,18", "8,18", "9,18",
-            "9,17", "8,17", "7,17", "6,17", "5,17", "4,17", "3,17", "2,17", "1,17",
-            "1,16", "1,15", "1,14", "2,14", "2,15", "2,16", "3,16", "3,15", "3,14",
-            "4,14", "4,15", "4,16", "5,16", "5,15", "5,14", "6,14", "6,15", "6,16",
-            "7,16", "7,15", "7,14", "8,14", "8,15", "8,16", "9,16", "9,15", "9,14",
-            "9,13", "9,12", "8,12", "8,13", "7,13", "7,12", "6,12", "6,13", "5,13",
-            "5,12", "4,12", "4,13", "3,13", "3,12", "2,12", "2,13", "1,13", "1,12",
-            "8,31", "9,31", "10,31", "10,33", "9,33", "8,33", "8,34", "9,34", "10,34",
-            "10,35", "9,35", "8,35", "8,36", "9,36", "10,36", "10,37", "9,37", "8,37",
-            "8,38", "9,38", "10,38", "28,22", "27,22", "26,22", "25,22", "24,22", "25,21",
-            "26,21", "27,21", "27,20", "26,20", "25,20", "25,19", "25,19", "24,19",
-            "24,18", "23,18", "25,18", "26,18", "27,18", "28,18", "29,18", "28,19",
-            "27,19", "26,19", "26,20", "27,20", "27,22", "27,22", "39,31", "40,31",
-            "41,31", "41,32", "40,32", "39,32", "39,34", "40,34", "41,34", "41,35",
-            "40,35", "39,35", "39,36", "40,36", "41,36", "41,37", "40,37", "39,37",
-            "39,38", "40,38", "41,38"));
-
-    // Coordenadas de spawn para MAPA 4 - ZONA 1 (fondoBatalla.png)
-    private static final Set<String> VALID_SPAWN_COORDS_MAP4_ZONE1 = new HashSet<>(Arrays.asList(
-            "36,20", "36,19", "35,19", "35,20", "35,21", "35,22", "35,23", "34,23", "34,22", "34,21", "34,20", "34,19",
-            "34,24", "34,25", "34,26", "34,27", "34,28", "34,29", "34,29", "34,30", "34,31", "34,32", "34,33", "35,33",
-            "35,32", "35,31", "35,30", "35,30", "35,29", "35,28", "35,27", "36,29", "36,30", "36,31", "36,31", "36,32",
-            "36,33", "37,32", "37,32", "37,31", "37,30", "37,29", "37,28", "38,29", "38,30", "38,31", "38,31", "38,32",
-            "38,33", "39,30", "39,29", "39,28", "41,28", "41,30", "40,30", "40,29", "33,33", "33,33", "33,32", "33,31",
-            "33,30", "33,29", "33,28", "33,27", "33,26", "33,25", "33,25", "33,24", "33,23", "33,22", "33,21", "33,20",
-            "33,19", "33,19", "33,21", "32,23", "32,24", "32,24", "32,25", "32,26", "32,27", "32,28", "32,29", "32,30",
-            "32,31", "32,32", "32,32", "31,33", "31,32", "31,31", "31,31", "31,30", "31,29", "31,28", "31,28", "31,27",
-            "31,26", "31,25", "31,24", "30,24", "30,25", "30,26", "30,27", "30,27", "30,28", "30,29", "30,30", "30,31",
-            "30,31", "29,32", "29,31", "29,30", "29,29", "29,29", "29,28", "29,27", "28,26", "28,27", "28,28", "28,29",
-            "28,30", "28,30", "27,30", "27,29", "27,28", "27,27", "27,27", "26,26", "26,26", "26,27", "26,26", "26,29",
-            "25,28", "25,25", "25,28", "25,27", "25,26", "32,19", "30,19", "30,19", "30,19"));
-
-    // Coordenadas de spawn para MAPA 4 - ZONA 2 (fondoBatalla4.png)
-    private static final Set<String> VALID_SPAWN_COORDS_MAP4_ZONE2 = new HashSet<>(Arrays.asList(
-            "48,31", "48,32", "48,33", "47,31", "47,32", "47,33", "47,33", "47,34", "47,34", "47,35", "47,36", "47,36",
-            "46,36", "46,35", "46,34", "46,33", "46,32", "46,36", "46,37", "46,37", "46,38", "46,38", "46,39", "46,40",
-            "46,41", "45,41", "45,42", "45,41", "45,40", "45,39", "45,37", "45,36", "45,35", "45,31", "44,31", "43,31",
-            "42,31", "42,31", "42,31", "42,32", "41,33", "40,31", "40,32", "41,32", "42,32", "43,32", "43,33", "43,34",
-            "43,35", "43,36", "43,37", "43,38", "43,38", "44,38", "44,39", "44,40", "44,41", "44,42", "44,42", "45,42",
-            "45,41", "45,40", "45,39", "44,37", "44,37", "44,36", "44,35", "44,35", "42,32", "42,33", "42,34", "42,35",
-            "42,36", "42,37", "42,37", "42,38", "41,38", "41,41", "41,39", "41,40", "41,41", "43,42", "42,42", "42,38",
-            "41,37", "41,36", "41,36", "41,35", "41,34", "41,33", "41,32", "40,32", "40,31", "40,33", "40,34", "40,34",
-            "40,35", "40,36", "40,37", "40,38", "40,39", "40,40", "40,40", "40,41", "39,41", "39,40", "39,39", "39,39",
-            "39,38", "39,37", "39,37", "39,36", "39,35", "39,34", "39,34", "38,34", "37,34", "37,35", "38,35", "37,35",
-            "38,37", "38,38", "39,40", "39,41", "39,40", "39,39", "37,38", "37,37", "37,37", "37,37", "37,36", "37,35",
-            "37,34", "37,35", "37,35", "37,36", "36,37", "36,38", "36,39", "36,40", "36,41", "36,42", "36,43", "36,43",
-            "36,43", "37,43", "38,43", "38,42", "37,42", "37,42", "35,43", "35,42", "35,41", "35,40", "35,39", "35,39",
-            "35,38", "35,37", "35,37", "34,37", "34,38", "34,39", "34,40", "34,41", "34,41", "34,42", "33,41", "33,42",
-            "33,42", "33,42", "33,42", "34,39", "33,39", "32,39", "32,39", "32,39", "33,39", "34,39"));
-
-    // Coordenadas de coleccionables para MAPA3 (X,Y)
-    private static final Set<String> VALID_COLLECTIBLE_COORDS_MAP3 = new HashSet<>(Arrays.asList(
-            // Coordenadas anteriores
-            "26,34", "26,33", "26,32", "26,31", "26,30", "26,29", "26,28", "26,27", "26,26", "26,25", "26,24",
-            "27,23", "27,24", "27,25", "27,26", "27,27", "27,28", "27,29", "27,30", "27,31", "27,32", "27,33", "27,34",
-            "28,23", "28,24", "28,25", "28,26", "28,27", "28,28", "28,29", "28,30", "28,32", "28,33", "28,34",
-            "29,25", "29,26", "29,27", "29,28", "29,29", "29,30", "29,31", "29,33", "29,34",
-            "30,24", "30,25", "30,26", "30,27", "30,28", "30,29",
-            "31,24", "31,25", "31,26", "31,27", "31,28", "31,29",
-            "32,24", "32,25", "32,26", "32,27", "32,28",
-            "33,25", "33,26", "33,27", "33,28", "33,29",
-            "34,24", "34,25", "34,26", "34,27", "34,28", "34,29", "34,30",
-            "35,24", "35,25", "35,26", "35,27", "35,28", "35,29", "35,30",
-            "36,24", "36,25", "36,26", "36,27", "36,28", "36,29", "36,30",
-            "37,24", "37,25", "37,26", "37,27", "37,28", "37,29",
-            "38,22", "38,23", "38,24", "38,25", "38,26", "38,27", "38,28", "38,29", "38,30",
-            "39,21", "39,22", "39,23", "39,24", "39,27", "39,28", "39,29",
-            "40,21", "40,22", "40,23", "40,24", "40,25", "40,27", "40,28", "40,29",
-            "41,21", "41,22", "41,23", "41,24", "41,25", "41,27", "41,28", "41,29",
-            "42,21", "42,22", "42,23", "42,24", "42,25", "42,27", "42,28", "42,29", "42,30",
-            "43,21", "43,22", "43,23", "43,24", "43,25", "43,27", "43,28", "43,29", "43,30",
-            "44,21", "44,22", "44,23", "44,24", "44,25", "44,27", "44,28", "44,29", "44,30",
-            "45,21", "45,22", "45,23", "45,24", "45,25", "45,27", "45,29", "45,30",
-            // Nuevas coordenadas
-            "25,33", "25,32", "25,31", "25,30", "25,29", "25,28", "25,27", "25,26", "25,25", "25,24", "25,23",
-            "24,23", "24,34",
-            "23,24", "23,26", "23,27", "23,28", "23,29", "23,30", "23,31", "23,32", "23,33", "23,34",
-            "22,25", "22,26", "22,27", "22,28", "22,29", "22,30", "22,31", "22,32", "22,33",
-            "21,28", "21,29",
-            "20,28", "20,29",
-            "19,28", "19,29",
-            "18,28", "18,29",
-            "17,28", "17,29",
-            "16,28", "16,29",
-            "15,23", "15,24", "15,25", "15,26", "15,27", "15,28", "15,29", "15,30",
-            "14,22", "14,23", "14,24", "14,25", "14,26", "14,27", "14,28", "14,29", "14,30",
-            "13,20", "13,21", "13,22", "13,23", "13,24", "13,25", "13,26", "13,28", "13,29", "13,30",
-            "12,20", "12,21", "12,22", "12,23", "12,24", "12,25", "12,26", "12,27", "12,28", "12,29", "12,30",
-            "11,19", "11,20", "11,21", "11,22", "11,23", "11,24", "11,25", "11,26", "11,27", "11,28", "11,29", "11,30",
-            "10,22", "10,23", "10,24", "10,25", "10,26", "10,27", "10,28", "10,29",
-            "9,23", "9,24", "9,25", "9,26", "9,27", "9,28", "9,29",
-            "8,22", "8,23", "8,24", "8,25", "8,26", "8,27", "8,28", "8,29",
-            "7,22", "7,23", "7,24", "7,25", "7,26", "7,27", "7,28", "7,29", "7,30",
-            "6,19", "6,20", "6,21", "6,22", "6,23", "6,24", "6,25", "6,26", "6,27", "6,28", "6,29", "6,30",
-            "5,19", "5,20", "5,21", "5,22", "5,23", "5,24", "5,25", "5,26", "5,27", "5,28", "5,29", "5,30",
-            "4,19", "4,20", "4,21", "4,22", "4,23", "4,24", "4,25", "4,26", "4,27", "4,29", "4,30",
-            "3,22", "3,23", "3,24", "3,25", "3,26", "3,27", "3,28", "3,29", "3,30",
-            "2,22", "2,23", "2,24", "2,25", "2,26", "2,27", "2,28", "2,29", "2,30",
-            "1,30"));
-
-    // Coordenadas de coleccionables para MAPA 4 (X,Y)
-    private static final Set<String> VALID_COLLECTIBLE_COORDS_MAP4 = new HashSet<>(Arrays.asList(
-            "20,0", "19,0", "18,0", "17,0", "17,1", "18,1", "19,1", "20,1", "21,1", "22,1", "23,1", "24,1", "25,1",
-            "26,1", "27,1", "28,1", "29,1", "30,0", "30,1", "30,2", "29,2", "28,2", "27,2", "26,2", "25,2", "24,2",
-            "22,2",
-            "21,2", "20,2", "19,2", "18,2", "17,2", "17,4", "16,4", "18,4", "19,4", "20,4", "21,4", "22,4", "23,4",
-            "24,4",
-            "25,4", "26,4", "27,4", "28,4", "29,4", "30,4", "31,4", "31,5", "32,5", "33,5", "30,5", "29,5", "28,5",
-            "27,5",
-            "25,5", "24,5", "23,5", "22,5", "21,5", "20,5", "19,5", "18,5", "17,5", "16,5", "15,5", "14,5", "14,6",
-            "13,6",
-            "15,6", "16,6", "17,6", "18,6", "19,6", "20,6", "21,6", "22,6", "23,6", "24,6", "25,6", "26,6", "27,6",
-            "28,6",
-            "29,6", "30,6", "31,6", "32,6", "33,6", "34,6", "13,7", "12,7", "11,7", "14,7", "15,7", "16,7", "17,7",
-            "18,7",
-            "19,7", "20,7", "21,7", "22,7", "23,7", "24,7", "25,7", "26,7", "27,7", "28,7", "29,7", "30,7", "31,7",
-            "32,7",
-            "33,7", "34,7", "35,7", "36,7", "36,8", "35,8", "34,8", "33,8", "32,8", "31,8", "30,8", "29,8", "28,8",
-            "27,8",
-            "26,8", "25,8", "24,8", "23,8", "22,8", "21,8", "20,8", "19,8", "18,8", "17,8", "16,8", "15,8", "14,8",
-            "13,8",
-            "12,8", "11,8", "11,9", "10,9", "9,9", "8,9", "7,9", "6,9", "5,9", "4,9", "3,9", "2,9", "1,9", "0,9",
-            "12,9",
-            "13,9", "14,9", "15,9", "16,9", "17,9", "18,9", "19,9", "20,9", "21,9", "22,9", "23,9", "24,9", "25,9",
-            "26,9",
-            "27,9", "28,9", "29,9", "30,9", "31,9", "32,9", "33,9", "34,9", "35,9", "36,9", "37,9", "38,9", "39,9",
-            "40,9",
-            "41,9", "42,9", "43,9", "44,9", "45,9", "46,9", "47,9", "48,9", "49,9", "49,10", "48,10", "47,10", "46,10",
-            "45,10", "44,10", "43,10", "42,10", "41,10", "40,10", "39,10", "38,10", "37,10", "36,10", "35,10", "34,10",
-            "33,10", "32,10", "31,10", "30,10", "29,10", "28,10", "27,10", "26,10", "25,10", "24,10", "23,10", "22,10",
-            "21,10", "20,10", "19,10", "18,10", "17,10", "16,10", "15,10", "14,10", "13,10", "12,10", "11,10", "10,10",
-            "9,10", "8,10", "7,10", "6,10", "5,10", "4,10", "3,10", "2,10", "1,10", "0,10",
-            "0,11", "0,12", "0,13", "0,14", "0,15", "0,18", "0,19", "0,20", "0,21", "0,22", "0,24", "0,25", "0,26",
-            "0,27",
-            "0,28", "1,15", "1,19", "1,28", "2,14", "2,19", "2,25", "2,26", "2,27", "2,28", "3,14", "3,16", "3,17",
-            "3,18",
-            "3,19", "3,20", "3,21", "3,22", "3,24", "3,25", "3,26", "3,27", "3,28", "4,13", "4,14", "4,15", "4,16",
-            "4,17",
-            "4,19", "4,20", "4,23", "4,24", "5,17", "5,18", "6,17", "6,18", "6,21", "6,22", "7,17", "7,18", "7,21",
-            "7,22",
-            "7,23", "7,24", "7,25", "7,26", "8,13", "8,14", "8,15", "8,16", "9,13", "9,14", "9,15", "9,16", "9,21",
-            "9,22",
-            "9,25", "9,26", "10,13", "10,14", "10,15", "10,16", "10,20", "10,21", "10,22", "10,23", "10,24", "10,25",
-            "10,26", "10,27", "10,28", "11,13", "11,15", "11,16", "11,19", "11,21", "11,22", "11,23", "11,24", "11,25",
-            "11,27", "11,28", "12,12", "12,13", "12,14", "12,15", "12,16", "12,19", "12,20", "12,21", "12,22", "12,23",
-            "12,24", "12,25", "12,26", "12,27", "12,28", "13,13", "13,14", "13,16", "13,19", "13,20", "13,23", "13,27",
-            "13,28", "14,13", "14,14", "14,15", "14,16", "14,19", "14,27", "14,28", "15,13", "15,14", "15,15", "15,16",
-            "16,13", "16,14", "16,18", "16,19", "16,26", "16,27", "17,13", "17,14", "17,15", "17,16", "17,18", "17,20",
-            "17,21", "17,22", "17,23", "17,24", "17,25", "17,27", "18,12", "18,14", "18,15", "18,16", "18,18", "18,19",
-            "18,20", "18,22", "18,23", "18,24", "18,25", "18,26", "19,14", "19,15", "19,16", "19,18", "19,19", "19,20",
-            "19,21", "19,22", "19,23", "19,24", "19,25", "19,26", "20,13", "20,14", "20,15", "20,16", "20,23", "20,26",
-            "20,27", "21,13", "21,15", "21,16", "21,23", "21,26", "22,13", "22,15", "22,16", "22,23", "22,24", "22,25",
-            "22,26", "22,27", "22,28", "23,16", "23,17", "23,18", "23,19", "23,20", "23,21", "23,22", "23,24", "23,25",
-            "23,26", "23,27", "23,28", "24,14", "24,15", "24,16", "24,17", "24,18", "24,19", "24,20", "24,21", "24,24",
-            "24,27", "24,28", "25,14", "25,15", "25,16", "25,21", "25,24", "26,14", "26,15", "26,16", "26,20", "26,21",
-            "26,22", "26,23", "26,24", "27,14", "27,15", "27,16", "27,17", "27,18", "27,19", "27,20", "27,21", "27,24",
-            "28,14", "28,15", "28,16", "28,17", "28,18", "28,19", "28,20", "28,22", "28,23", "28,24", "29,14", "29,15",
-            "29,16", "30,14", "30,15", "30,16", "30,44", "30,45", "31,14", "31,16", "32,14", "32,15", "32,16", "33,14",
-            "33,15", "33,16", "34,14", "34,15", "35,14", "35,15", "35,16", "36,14", "36,15", "36,16", "36,25", "37,14",
-            "37,15", "37,16", "37,21", "37,22", "37,23", "37,24", "37,25", "38,14", "38,15", "38,16", "38,19", "38,20",
-            "38,21", "38,22", "39,14", "39,15", "39,16", "39,19", "39,20", "40,14", "40,15", "40,16", "40,19", "40,20",
-            "40,21", "40,23", "40,24", "40,25", "41,14", "41,15", "41,16", "41,18", "41,19", "41,24", "41,25", "42,15",
-            "42,16", "42,17", "42,18", "42,19", "42,24", "42,25", "43,14", "43,15", "43,16", "43,17", "43,18", "43,19",
-            "43,24", "43,25", "43,28", "43,29", "44,14", "44,15", "44,16", "44,17", "44,18", "44,19", "44,20", "44,21",
-            "44,22", "44,24", "44,27", "44,28", "44,29", "44,30", "45,14", "45,15", "45,18", "45,20", "45,21", "45,22",
-            "45,23", "45,24", "45,28", "45,30", "46,14", "46,15", "46,16", "46,17", "46,18", "46,19", "46,21", "46,23",
-            "46,24", "46,25", "46,26", "46,27", "46,28", "46,29", "46,30", "47,14", "47,15", "47,16", "47,17", "47,18",
-            "47,19", "47,21", "47,23", "47,24", "47,25", "47,26", "47,27", "47,28", "47,30", "48,14", "48,15", "48,16",
-            "48,17", "48,18", "48,19", "48,21", "48,23", "48,24", "48,25", "48,27", "48,28", "48,29", "48,30", "49,14",
-            "49,15", "49,16", "49,17", "49,18", "49,19", "49,21", "49,22", "49,23", "49,24", "49,25", "49,26", "49,27",
-            "49,28", "49,29", "49,30"));
 
     // --- SISTEMA DE ENCUENTROS ---
     private Array<EncounterZone> encounterZones;
@@ -362,7 +212,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         WAITING_FOR_CHOICE,
         INVENTORY_SUBMENU,
         POKEDEX_ACTION_MENU,
-        POKEMON_INFO
+        POKEMON_INFO,
+        POKEMONES_MENU,
+        TYPES_MENU,
+        ATTACKS_MENU
     }
 
     private float arceusMarkerTimer = 0f;
@@ -386,7 +239,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     private float transitionTimer = 0f;
     private final float transitionDuration = 0.5f;
-    private boolean isFadingIn = true; // Start with fade-in
+    private boolean isFadingIn = false; // Disabled to prevent map appearing dark
 
     private Texture blackPixelTexture;
 
@@ -395,7 +248,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private Image yoelImage;
 
     // **VARIABLE ELIMINADA: private boolean pendingPokemonSelection = false;**
-    private String mapPath;
+    protected String mapPath;
     private Screen nextScreen;
 
     public Inventario playerInventory;
@@ -412,8 +265,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private Label craftingStatusLabel;
 
     private Map<Integer, Texture> itemTextures = new HashMap<>();
-    private Array<Collectible> collectibles;
-    private Random random;
+    protected Array<Collectible> collectibles;
+    protected Random random;
 
     // DEBUG: Set para que el usuario pueda grabar IDs de tiles
     private Set<Integer> recordedTiles = new HashSet<>();
@@ -427,64 +280,39 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     // Track source map when entering Pokemon Center
     private String sourceMapBeforePokemonCenter = null;
+    private Float returnTileXBeforePokemonCenter = null;
+    private Float returnTileYBeforePokemonCenter = null;
 
-    // --- CIRCUS BABY NPC (ANIMATED) ---
-    private Texture circusBabyTexture1;
-    private Texture circusBabyTexture2;
-    private Image circusBabyActor;
-    private float circusBabyAnimTimer = 0;
-    private boolean circusBabyFrame1 = true;
+    // --- BATTLE NPCs ---
+    private Texture kaneki1Texture, kaneki2Texture;
+    private Image kanekiImage;
+    private Texture jesucristo1Texture, jesucristo2Texture;
+    private Image jesucristoImage;
+    private Texture afton1Texture, afton2Texture;
+    private Image aftonImage;
+    private Texture pennywise1Texture, pennywise2Texture;
+    private Image pennywiseImage;
+    private Texture jotaro1Texture, jotaro2Texture;
+    private Image jotaroImage;
+    private Texture donValerio1Texture, donValerio2Texture;
+    private Image donValerioImage;
+    private Texture giorno1Texture, giorno2Texture;
+    private Image giornoImage;
 
-    // --- FUNTIME FOXY NPC (ANIMATED) ---
-    private Texture funtimeFoxyTexture1;
-    private Texture funtimeFoxyTexture2;
-    private Image funtimeFoxyActor;
-    private float funtimeFoxyAnimTimer = 0;
-    private boolean funtimeFoxyFrame1 = true;
+    // --- DIALOGUE NPCs ---
+    private Texture bonnie1Texture, bonnie2Texture;
+    private Image bonnieImage;
+    private Texture fntFoxy1Texture, fntFoxy2Texture;
+    private Image fntFoxyImage;
+    private Texture circusBaby1Texture, circusBaby2Texture;
+    private Image circusBabyImage;
+    private Texture foxy1Texture, foxy2Texture;
+    private Image foxyImage;
+    private Texture freddy1Texture, freddy2Texture;
+    private Image freddyImage;
 
-    // --- FUNTIME FREDDY NPC (ANIMATED) ---
-    private Texture funtimeFreddyTexture1;
-    private Texture funtimeFreddyTexture2;
-    private Image funtimeFreddyActor;
-    private float funtimeFreddyAnimTimer = 0;
-    private boolean funtimeFreddyFrame1 = true;
-
-    // --- MAP 2 BATTLE NPCs (ANIMATED) ---
-    private Texture giornoTexture1;
-    private Texture giornoTexture2;
-    private Image giornoActor;
-    private float giornoAnimTimer = 0;
-    private boolean giornoFrame1 = true;
-
-    private Texture jotaroTexture1;
-    private Texture jotaroTexture2;
-    private Image jotaroActor;
-    private float jotaroAnimTimer = 0;
-    private boolean jotaroFrame1 = true;
-
-    private Texture kanekiTexture1;
-    private Texture kanekiTexture2;
-    private Image kanekiActor;
-    private float kanekiAnimTimer = 0;
-    private boolean kanekiFrame1 = true;
-
-    // Battle state tracking for Map 2 NPCs
-    private boolean giornoDefeated = false;
-    private boolean jotaroDefeated = false;
-    private boolean kanekiDefeated = false;
-
-    // --- MAP 4 NPCs ---
-    private Texture jesucristoTexture1, jesucristoTexture2;
-    private Image jesucristoActor;
-    private float jesucristoAnimTimer = 0;
-    private boolean jesucristoFrame1 = true;
-    private boolean jesucristoDefeated = false;
-
-    private Texture aftonTexture1, aftonTexture2;
-    private Image aftonActor;
-    private float aftonAnimTimer = 0;
-    private boolean aftonFrame1 = true;
-    private boolean aftonDefeated = false;
+    private float npcAnimationTimer = 0f;
+    private final float NPC_FRAME_DURATION = 0.5f;
 
     // --- SUBMENUS ---
     private Table inventorySubmenuTable;
@@ -496,6 +324,13 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private Table pokemonInfoTable;
     private Pokemon selectedPokemonForHealing = null;
 
+    // --- POKEMONES MENU ---
+    private Table pokemonesMenuTable;
+    private Table typesMenuTable;
+    private Table attacksMenuTable;
+    private int selectedPokemonesMenuIndex = 0;
+    private TextButton[] pokemonesMenuButtons;
+
     private int lastLogTileX = -1;
     private int lastLogTileY = -1;
 
@@ -505,33 +340,312 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     // Variables para el fondo de batalla dínámico
     private String pendingBattleBackground = null;
 
+    // --- TILES DE ENCUENTRO ESPECIAL (MAPA 1) ---
+    private static final Set<String> SPECIAL_ENCOUNTER_TILES_MAP1 = new HashSet<>(Arrays.asList(
+            "70,34", "70,33", "69,33", "68,33", "67,33", "66,33", "65,33", "64,33", "63,33",
+            "63,32", "64,32", "65,32", "66,32", "67,32", "68,32", "69,32", "70,32",
+            "70,31", "69,31", "68,31", "67,31", "66,31", "65,31", "64,31", "63,31",
+            "63,30", "64,30", "65,30", "66,30", "67,30", "68,30", "69,30", "70,30",
+            "70,29", "69,29", "68,29", "67,29", "66,29", "65,29", "64,29", "63,29",
+            "63,28", "64,28", "65,28", "66,28", "67,28", "68,28", "69,28", "70,28",
+            "83,40", "84,40", "83,39", "84,39", "85,39", "86,39",
+            "83,38", "84,38", "85,38", "86,38", "87,38", "88,38", "89,38", "90,38",
+            "90,37", "89,37", "88,37", "87,37", "86,37", "85,37", "84,37",
+            "84,23", "84,24", "84,25", "84,26", "84,27", "85,28", "85,27", "85,26", "85,25", "85,24", "85,23", "85,22",
+            "85,21",
+            "86,21", "86,22", "86,23", "86,24", "86,25", "86,26", "86,27", "86,28",
+            "87,29", "87,28", "87,27", "87,26", "87,25", "87,24", "87,22", "87,21",
+            "88,21", "88,22", "88,23", "88,24", "88,25", "88,26", "88,27", "88,28", "88,29",
+            "89,29", "89,28", "89,27", "89,26", "89,25", "89,24", "89,23", "89,22", "89,21",
+            "90,21", "90,22", "90,23", "90,24", "90,25", "90,26", "90,27", "90,28",
+            "91,27", "91,26", "91,25", "91,24", "91,23", "91,22",
+            "84,10", "85,10", "86,10", "87,10", "88,10", "89,10", "90,10", "91,10",
+            "91,9", "90,9", "89,9", "88,9", "87,9", "86,9", "85,9", "84,9",
+            "84,8", "85,8", "86,8", "87,8", "88,8", "89,8", "90,8", "91,8"));
+
+    private static final Set<String> SPECIAL_ENCOUNTER_TILES_MAP1_ZONE2 = new HashSet<>(Arrays.asList(
+            "129,57", "129,58", "129,59", "130,59", "130,58", "130,57", "131,57", "131,58", "131,59", "132,59",
+            "132,58", "132,57", "133,57", "133,58", "133,59", "133,60", "132,60", "134,60", "134,59", "134,58",
+            "134,57", "135,57", "135,56", "136,57", "136,58", "135,58", "135,59", "135,60", "135,61", "135,62",
+            "136,62", "136,61", "136,60", "136,59", "136,58", "137,58", "137,59", "137,60", "137,61", "137,62",
+            "138,62", "138,61", "138,60", "139,60", "139,61", "139,62", "96,63", "96,62", "96,61", "96,60", "96,59",
+            "96,58", "96,57", "96,56", "96,55", "96,54", "97,55", "97,56", "97,57", "97,58", "97,59", "97,60", "97,61",
+            "97,62", "97,63", "98,63", "98,62", "98,61", "98,60", "98,59", "98,58", "98,57", "98,56", "98,55", "98,54",
+            "98,53", "98,52", "97,51", "96,52", "96,53", "99,51", "98,52", "98,53", "98,54", "98,55", "98,56", "98,57",
+            "98,58", "98,59", "98,60", "98,61", "98,62", "99,62", "99,61", "99,60", "99,59", "99,58", "99,57", "99,56",
+            "99,55", "99,54", "99,53", "99,52", "99,51", "100,51", "100,52", "100,53", "100,54", "100,55", "100,56",
+            "101,51", "101,52", "101,53", "101,54", "101,55", "101,56", "102,57", "102,58", "102,59", "102,60",
+            "102,61", "102,62", "101,63", "100,63", "100,62", "100,61", "100,60", "101,60", "101,61", "101,62",
+            "103,63", "103,62", "103,61", "103,60", "103,59", "103,58", "103,57", "103,56", "103,55", "103,54",
+            "103,53", "103,52", "103,51", "104,52", "104,53", "104,54", "104,55", "104,56", "104,57", "104,58",
+            "104,59", "104,60", "104,61", "104,62", "104,63", "105,52", "105,53", "105,54", "105,55", "105,56",
+            "105,58", "105,59", "105,60", "105,61", "105,62", "106,62", "106,61", "106,60", "106,59", "106,58",
+            "106,57", "106,56", "106,55", "106,54", "106,53", "107,53", "107,54", "107,55", "107,56", "107,57",
+            "107,58", "107,59", "107,60", "107,61", "107,62", "107,63", "108,63", "109,63", "110,63", "111,63",
+            "112,63", "113,63", "113,62", "112,62", "111,62", "110,62", "110,61", "111,61", "112,61", "113,61",
+            "113,60", "113,59", "112,59", "111,59", "110,59", "110,58", "111,58", "112,58", "113,58", "113,57",
+            "113,56", "112,56", "111,56", "110,56", "110,55", "111,55", "112,55", "113,55", "113,54", "112,54",
+            "111,54", "110,53", "113,53", "114,53", "115,53", "115,54", "115,55", "115,56", "115,57", "115,58",
+            "117,58", "117,59", "117,60", "117,61", "117,62", "117,63", "118,63", "119,63", "120,63", "120,62",
+            "119,62", "118,61", "119,60", "120,60", "120,59", "119,59", "118,59", "118,58", "119,58", "120,58",
+            "120,57", "121,56", "121,55", "121,54", "121,53", "121,52", "121,51", "120,52", "120,53", "119,54",
+            "118,54", "118,55", "117,55", "117,56", "118,56", "119,56", "120,56", "120,55", "120,54", "120,53",
+            "120,52", "119,52", "118,52", "117,52", "116,52", "117,53", "118,53", "119,53", "118,55", "117,56",
+            "116,56", "116,57", "116,58", "114,58", "114,57", "114,56", "114,55", "113,55", "112,55", "111,54"));
+
+    private static final Set<String> SPECIAL_ENCOUNTER_TILES_MAP1_ZONE3 = new HashSet<>(Arrays.asList(
+            "26,44", "25,44", "24,44", "23,44", "22,44", "21,44", "20,44", "19,44", "18,44", "17,44",
+            "17,45", "16,45", "15,45", "15,44", "14,44", "13,44", "12,44", "11,44", "10,44", "11,45",
+            "11,46", "12,46", "13,46", "14,46", "15,46", "16,46", "17,46", "18,46", "19,46", "20,46",
+            "21,46", "22,46", "23,46", "24,46", "25,46", "26,46", "27,46", "28,46", "28,47", "27,47",
+            "26,47", "25,47", "24,47", "23,47", "22,47", "21,47", "20,47", "19,47", "18,47", "17,47",
+            "16,47", "15,47", "14,47", "13,47", "12,47", "11,47", "11,48", "11,49", "11,50", "11,51",
+            "11,52", "11,53", "10,54", "9,54", "8,54", "8,55", "8,56", "8,57", "8,58", "8,59",
+            "8,60", "8,61", "8,62", "9,63", "10,63", "11,63", "12,63", "13,63", "14,63", "13,62",
+            "12,62", "11,62", "10,62", "9,61", "10,60", "11,60", "12,60", "13,60", "11,59", "10,59",
+            "10,58", "11,58", "12,58", "11,57", "10,57", "10,56", "11,56", "12,57", "11,55", "10,55",
+            "9,55", "9,54", "10,54", "11,54", "11,53", "11,52", "11,51", "11,50", "11,49", "12,46",
+            "13,46", "19,45", "20,45", "21,45", "22,45", "23,45", "24,45", "25,45", "26,45", "27,45",
+            "28,46", "28,47", "28,48", "28,49", "28,50", "28,51", "28,52", "28,53", "28,54", "28,55",
+            "28,56", "28,57", "28,58", "28,59", "28,60", "28,61", "28,62", "29,62", "29,61", "29,60",
+            "29,59", "29,58", "29,57", "29,56", "29,55", "29,54", "27,54", "27,55", "27,56", "27,57",
+            "27,58", "27,59", "27,60", "26,61", "26,62", "26,63", "25,62", "24,62", "23,62", "22,62",
+            "21,62", "20,62", "19,62", "18,62", "17,62", "16,62", "15,62", "14,62", "14,61", "13,61",
+            "13,62", "12,63", "11,63", "10,63", "9,62", "10,61", "13,61", "32,62", "32,61", "32,60",
+            "32,59", "32,58", "33,58", "33,59", "33,60", "33,61", "33,62", "33,63", "34,58", "34,59",
+            "34,60", "34,61", "34,62", "34,63", "35,62", "35,61", "37,61", "37,62", "38,63", "38,62",
+            "38,61", "38,60", "39,62", "39,61", "39,60", "39,59", "39,58", "35,58", "36,58", "37,58",
+            "38,58", "39,58", "39,59", "38,59", "37,59", "36,59", "35,59", "35,60", "36,60", "37,60",
+            "38,60", "39,60", "20,48", "19,48", "19,47", "18,47", "17,47", "16,47", "13,47", "12,47",
+            "10,48", "10,49", "10,51", "10,52", "9,52", "9,53", "10,53", "13,59", "13,60", "14,60", "15,61"));
+
+    private static final Set<String> SPECIAL_ENCOUNTER_TILES_MAP1_ZONE4 = new HashSet<>(Arrays.asList(
+            "101,14", "101,13", "101,12", "101,11", "101,10", "101,9", "102,9", "102,10", "102,11", "102,12",
+            "102,13", "102,14", "103,14", "103,13", "103,12", "103,11", "103,9", "104,9", "104,10", "104,11",
+            "104,12", "104,13", "104,14", "105,14", "105,13", "105,12", "105,11", "105,8", "105,9", "105,10",
+            "106,13", "106,12", "106,11", "106,10", "106,9", "107,9", "107,10", "107,11", "107,12", "107,13",
+            "107,14", "108,14", "108,13", "108,12", "108,11", "108,10", "108,9", "109,9", "109,10", "109,11",
+            "109,12", "109,13", "124,14", "125,14", "126,14", "127,14", "128,14", "129,14", "128,15", "127,15",
+            "126,15", "125,15", "124,15", "125,16", "125,17", "125,18", "124,18", "125,18", "126,18", "127,18",
+            "128,18", "127,17", "126,17", "125,17", "125,16", "126,16", "127,16", "108,26", "108,27", "108,28",
+            "108,29", "108,30", "108,31", "108,32", "108,33", "109,34", "109,33", "109,32", "109,31", "109,30",
+            "109,29", "109,28", "109,27", "110,27", "110,28", "110,29", "110,30", "110,31", "110,32", "110,33",
+            "110,34", "139,26", "139,27", "139,28", "139,29", "139,30", "139,31", "139,32", "139,33", "139,34",
+            "140,33", "140,32", "140,31", "140,30", "140,29", "140,28", "140,27", "140,26", "141,26", "141,27",
+            "141,28", "141,29", "141,30", "141,31", "141,32", "141,33", "141,34"));
+
+    private static final Set<String> PRIMARY_MATERIAL_TILES_MAP1 = new HashSet<>(Arrays.asList(
+            "4,41", "4,42", "4,43", "4,44", "4,45", "5,40", "5,41", "5,42", "5,43", "5,44",
+            "5,45", "6,16", "6,17", "6,18", "6,19", "6,20", "6,21", "6,22", "6,40", "6,41",
+            "6,42", "6,43", "6,44", "7,16", "7,17", "7,18", "7,19", "7,20", "7,21", "7,22",
+            "7,40", "7,41", "8,16", "8,17", "8,18", "8,19", "8,20", "8,21", "8,40", "8,41",
+            "9,16", "9,17", "9,18", "9,19", "9,20", "9,21", "9,22", "9,40", "9,41", "10,16",
+            "10,17", "10,18", "10,19", "10,20", "10,21", "10,22", "10,23", "10,40", "10,41", "11,16",
+            "11,17", "11,18", "11,19", "11,20", "11,21", "11,22", "11,23", "11,40", "11,41", "12,16",
+            "12,17", "12,18", "12,19", "12,20", "12,21", "12,22", "12,40", "12,41", "13,16", "13,17",
+            "13,18", "13,19", "13,20", "13,21", "13,22", "13,23", "13,40", "13,41", "14,16", "14,17",
+            "14,18", "14,19", "14,20", "14,21", "14,22", "14,40", "14,41", "15,16", "15,17", "15,18",
+            "15,19", "15,20", "15,21", "15,22", "15,40", "15,41", "16,16", "16,17", "16,18", "16,19",
+            "16,20", "16,21", "16,40", "16,41", "17,16", "17,17", "17,22", "17,23", "17,39", "17,40",
+            "17,41", "18,16", "18,17", "18,18", "18,22", "18,23", "18,39", "18,40", "18,41", "19,16",
+            "19,17", "19,18", "19,22", "19,23", "19,39", "19,40", "20,16", "20,17", "20,18", "20,22",
+            "20,23", "20,39", "21,16", "21,17", "21,18", "21,19", "21,22", "21,23", "21,38", "21,39",
+            "21,40", "22,17", "22,18", "22,19", "22,20", "22,21", "22,22", "22,23", "22,38", "22,39",
+            "22,40", "23,5", "23,6", "23,8", "23,11", "24,5", "24,6", "24,7", "24,8", "24,10",
+            "24,11", "24,12", "24,13", "24,14", "24,15", "24,16", "24,17", "24,18", "24,19", "24,20",
+            "24,21", "24,22", "24,23", "24,24", "24,25", "24,26", "24,27", "24,28", "24,29", "24,30",
+            "24,31", "24,32", "24,33", "24,34", "24,35", "24,36", "24,37", "24,38", "24,39", "25,5",
+            "25,6", "25,7", "25,8", "25,10", "25,11", "25,12", "25,13", "25,14", "25,15", "25,16",
+            "25,17", "25,18", "25,19", "25,20", "25,21", "25,22", "25,23", "25,24", "25,25", "25,26",
+            "25,27", "25,28", "25,29", "25,30", "25,31", "25,32", "25,33", "25,34", "25,35", "25,36",
+            "25,37", "25,38", "25,39", "26,5", "26,6", "26,7", "26,8", "26,10", "26,11", "26,12",
+            "26,13", "26,14", "26,15", "26,16", "26,17", "26,18", "26,19", "26,20", "26,21", "26,22",
+            "26,23", "26,24", "26,25", "26,26", "26,27", "26,28", "26,29", "26,30", "26,31", "26,32",
+            "26,33", "26,34", "26,35", "26,36", "26,37", "26,38", "26,39", "27,5", "27,6", "27,7",
+            "27,8", "27,10", "27,11", "27,12", "27,13", "27,14", "27,15", "27,16", "27,17", "27,18",
+            "27,19", "27,20", "27,21", "27,22", "27,23", "27,24", "27,25", "27,26", "27,27", "27,28",
+            "27,29", "27,30", "27,31", "27,32", "27,33", "27,34", "27,35", "27,36", "27,37", "27,38",
+            "28,5", "28,6", "28,7", "28,8", "28,10", "28,11", "28,12", "28,13", "28,14", "28,15",
+            "28,16", "28,17", "28,18", "28,19", "28,20", "28,21", "28,22", "28,23", "28,24", "28,25",
+            "28,26", "28,27", "28,28", "28,29", "28,30", "28,31", "28,32", "28,33", "28,34", "28,35",
+            "28,36", "28,37", "28,38", "28,39", "29,15", "29,17", "30,16", "30,17", "30,18", "30,19",
+            "30,20", "30,21", "30,22", "30,23", "30,24", "30,25", "30,26", "31,16", "31,17", "31,18",
+            "31,23", "31,24", "31,25", "31,26", "32,16", "32,17", "32,18", "32,22", "32,23", "32,24",
+            "32,25", "32,26", "33,16", "33,17", "33,18", "33,22", "33,23", "33,24", "33,25", "33,26",
+            "34,16", "34,17", "34,22", "34,23", "34,24", "34,25", "34,26", "35,16", "35,17", "35,18",
+            "35,22", "35,23", "35,24", "35,25", "35,26", "36,16", "36,18", "36,22", "36,23", "36,24",
+            "37,16", "37,18", "37,22", "37,23", "37,24", "37,25", "38,16", "38,17", "38,18", "38,22",
+            "38,24", "39,16", "39,17", "39,18", "39,22", "39,23", "40,16", "40,17", "40,18", "40,23",
+            "41,15", "41,16", "41,17", "41,18", "41,19", "41,20", "41,21", "41,22", "41,23", "42,16",
+            "42,17", "42,18", "42,19", "42,20", "42,21", "42,22", "42,23", "43,17", "43,18", "43,19",
+            "43,20", "43,21", "43,22", "43,23", "44,16", "44,17", "44,18", "44,19", "44,20", "44,21",
+            "44,22", "44,23", "45,16", "45,18", "45,19", "45,20", "45,22", "45,23", "46,12", "46,13",
+            "46,14", "46,15", "46,16", "46,17", "46,18", "46,19", "46,20", "46,21", "46,22", "46,23",
+            "46,24", "47,12", "47,13", "47,14", "47,15", "47,16", "47,17", "47,18", "47,19", "47,20",
+            "47,21", "47,22", "47,23", "47,24", "47,25", "48,13", "48,14", "48,15", "48,16", "48,17",
+            "48,18", "49,13", "49,14", "49,15", "49,16", "49,17", "50,14", "50,15", "50,16", "50,17",
+            "50,55", "50,56", "50,57", "50,58", "50,59", "50,60", "50,61", "50,63", "51,13", "51,14",
+            "51,15", "51,16", "51,17", "51,55", "51,56", "51,57", "51,58", "51,59", "51,60", "51,61",
+            "51,63", "52,13", "52,14", "52,15", "52,16", "52,17", "52,55", "52,56", "52,57", "52,58",
+            "52,59", "52,60", "52,61", "52,63", "53,13", "53,14", "53,15", "53,16", "53,17", "53,55",
+            "53,56", "53,57", "53,58", "53,59", "53,60", "53,61", "53,63", "54,13", "54,14", "54,15",
+            "54,16", "54,17", "54,55", "54,56", "54,57", "54,58", "54,59", "54,60", "54,61", "54,63",
+            "55,13", "55,14", "55,15", "55,16", "55,17", "55,55", "55,56", "55,57", "55,58", "56,13",
+            "56,14", "56,15", "56,16", "56,17", "56,55", "56,56", "56,57", "56,58", "57,13", "57,14",
+            "57,15", "57,16", "57,17", "57,55", "57,56", "57,57", "57,58", "58,13", "58,14", "58,15",
+            "58,16", "58,17", "58,55", "58,56", "58,57", "58,58", "58,59", "58,60", "58,61", "58,62",
+            "58,63", "59,13", "59,14", "59,15", "59,16", "59,55", "59,56", "59,57", "59,58", "59,59",
+            "59,60", "59,61", "59,62", "59,63", "60,13", "60,14", "60,15", "60,16", "60,17", "60,55",
+            "60,56", "60,57", "60,62", "60,63", "61,14", "61,15", "61,16", "61,17", "61,53", "61,54",
+            "61,55", "61,56", "61,57", "61,62", "61,63", "62,13", "62,14", "62,15", "62,16", "62,17",
+            "62,53", "62,54", "62,55", "62,56", "62,57", "62,62", "62,63", "63,13", "63,14", "63,15",
+            "63,16", "63,17", "63,20", "63,52", "63,53", "63,54", "63,55", "63,56", "63,57", "63,62",
+            "63,63", "64,13", "64,14", "64,15", "64,16", "64,17", "64,18", "64,19", "64,20", "64,51",
+            "64,52", "64,53", "64,54", "64,55", "64,56", "64,57", "64,62", "64,63", "65,13", "65,14",
+            "65,15", "65,16", "65,17", "65,18", "65,19", "65,20", "65,51", "65,52", "65,53", "65,54",
+            "65,55", "65,56", "65,57", "65,62", "65,63", "66,13", "66,14", "66,15", "66,16", "66,17",
+            "66,18", "66,19", "66,50", "66,51", "66,52", "66,53", "66,54", "66,55", "66,56", "66,57",
+            "66,62", "66,63", "67,14", "67,15", "67,16", "67,17", "67,18", "67,19", "67,46", "67,47",
+            "67,48", "67,49", "67,50", "67,51", "67,52", "67,53", "67,54", "67,55", "67,56", "67,57",
+            "67,62", "67,63", "68,15", "68,16", "68,17", "68,18", "68,19", "68,46", "68,47", "68,48",
+            "68,49", "68,50", "68,51", "68,52", "68,53", "68,54", "68,55", "68,56", "68,57", "68,58",
+            "68,59", "68,60", "68,62", "68,63", "69,2", "69,3", "69,4", "69,5", "69,6", "69,7",
+            "69,8", "69,9", "69,14", "69,15", "69,16", "69,17", "69,18", "69,19", "69,20", "69,46",
+            "69,47", "69,48", "69,49", "69,50", "69,51", "69,52", "69,53", "69,54", "69,55", "69,56",
+            "69,57", "69,58", "69,59", "69,60", "69,62", "69,63", "70,2", "70,3", "70,4", "70,5",
+            "70,6", "70,7", "70,8", "70,9", "70,10", "70,11", "70,12", "70,14", "70,15", "70,16",
+            "70,17", "70,18", "70,19", "70,20", "70,21", "70,47", "70,48", "70,49", "70,50", "70,51",
+            "70,52", "70,53", "70,57", "70,58", "70,59", "70,60", "70,62", "70,63", "71,3", "71,4",
+            "71,5", "71,6", "71,7", "71,8", "71,9", "71,11", "71,12", "71,13", "71,14", "71,15",
+            "71,16", "71,18", "71,19", "71,20", "71,46", "71,47", "71,48", "71,49", "71,50", "71,51",
+            "71,52", "71,53", "71,57", "71,58", "71,59", "71,60", "71,62", "71,63", "72,2", "72,3",
+            "72,4", "72,5", "72,6", "72,7", "72,8", "72,11", "72,13", "72,14", "72,15", "72,16",
+            "72,17", "72,18", "72,19", "72,20", "72,21", "72,22", "72,23", "72,43", "72,44", "72,47",
+            "72,48", "72,49", "72,50", "72,51", "72,52", "72,53", "72,56", "72,57", "72,58", "72,59",
+            "72,60", "72,62", "72,63", "73,2", "73,3", "73,4", "73,5", "73,6", "73,7", "73,8",
+            "73,9", "73,11", "73,12", "73,13", "73,14", "73,15", "73,16", "73,17", "73,18", "73,19",
+            "73,20", "73,21", "73,22", "73,23", "73,24", "73,25", "73,26", "73,27", "73,28", "73,29",
+            "73,30", "73,31", "73,32", "73,33", "73,34", "73,35", "73,36", "73,37", "73,38", "73,39",
+            "73,40", "73,41", "73,42", "73,43", "73,46", "73,47", "73,48", "73,49", "73,50", "73,51",
+            "73,52", "73,53", "73,54", "73,55", "73,56", "73,57", "73,58", "73,59", "73,60", "73,62",
+            "73,63", "74,2", "74,3", "74,4", "74,5", "74,6", "74,7", "74,8", "74,9", "74,10",
+            "74,11", "74,13", "74,14", "74,15", "74,16", "74,17", "74,18", "74,19", "74,20", "74,21",
+            "74,22", "74,25", "74,26", "74,27", "74,28", "74,29", "74,30", "74,31", "74,32", "74,34",
+            "74,35", "74,36", "74,38", "74,39", "74,40", "74,41", "74,42", "74,43", "74,44", "74,46",
+            "74,47", "74,48", "74,49", "74,50", "74,51", "74,52", "74,53", "74,54", "74,56", "74,57",
+            "74,58", "74,62", "74,63", "75,8", "75,9", "75,10", "75,13", "75,14", "75,19", "75,20",
+            "75,21", "75,22", "75,23", "75,24", "75,25", "75,26", "75,27", "75,28", "75,29", "75,30",
+            "75,47", "75,48", "75,49", "75,50", "75,52", "75,53", "75,54", "75,55", "75,56", "75,57",
+            "75,58", "75,62", "75,63", "76,8", "76,9", "76,10", "76,11", "76,12", "76,13", "76,14",
+            "76,15", "76,19", "76,20", "76,21", "76,22", "76,23", "76,24", "76,25", "76,26", "76,27",
+            "76,28", "76,29", "76,30", "76,47", "76,48", "76,49", "76,50", "76,51", "76,52", "76,53",
+            "76,54", "76,55", "76,56", "76,57", "76,58", "76,59", "76,61", "76,62", "76,63", "77,8",
+            "77,9", "77,10", "77,12", "77,14", "77,15", "77,19", "77,20", "77,21", "77,22", "77,23",
+            "77,24", "77,25", "77,26", "77,27", "77,28", "77,29", "77,46", "77,47", "77,48", "77,49",
+            "77,50", "77,51", "77,52", "77,56", "77,57", "77,58", "77,59", "77,61", "77,62", "77,63",
+            "78,8", "78,9", "78,10", "78,12", "78,13", "78,14", "78,15", "78,18", "78,19", "78,20",
+            "78,21", "78,22", "78,23", "78,24", "78,25", "78,26", "78,27", "78,28", "78,29", "78,47",
+            "78,48", "78,49", "78,50", "78,51", "78,52", "78,56", "78,57", "78,63", "79,8", "79,9",
+            "79,10", "79,13", "79,14", "79,15", "79,16", "79,17", "79,18", "79,19", "79,20", "79,21",
+            "79,22", "79,23", "79,24", "79,25", "79,26", "79,27", "79,28", "79,29", "79,46", "79,47",
+            "79,48", "79,49", "79,50", "80,8", "80,9", "80,10", "80,15", "80,16", "80,17", "80,18",
+            "80,19", "80,20", "80,21", "80,22", "80,23", "80,24", "80,25", "80,26", "80,48", "80,49",
+            "80,50", "80,51", "81,8", "81,9", "81,10", "81,16", "81,17", "81,18", "81,19", "81,20",
+            "81,21", "81,22", "81,23", "81,24", "81,25", "81,26", "81,27", "81,48", "81,49", "81,50",
+            "81,51", "82,8", "82,9", "82,10", "82,15", "82,16", "82,17", "82,18", "82,19", "82,20",
+            "82,21", "82,22", "82,23", "82,24", "82,25", "82,26", "82,27", "82,48", "82,49", "82,50",
+            "82,51", "82,52", "83,18", "83,19", "83,20", "83,28", "83,29", "83,30", "83,48", "83,49",
+            "83,50", "83,51", "84,17", "84,18", "84,19", "84,29", "84,30", "84,48", "84,49", "84,50",
+            "84,51", "85,17", "85,18", "85,19", "85,29", "85,30", "85,31", "85,48", "85,49", "85,50",
+            "85,51", "86,17", "86,18", "86,19", "86,30", "86,31", "86,48", "86,49", "86,50", "86,51",
+            "87,17", "87,18", "87,19", "87,30", "87,31", "87,48", "87,49", "87,50", "87,51", "88,17",
+            "88,18", "88,19", "88,31", "88,48", "88,49", "88,50", "88,51", "89,17", "89,18", "89,19",
+            "89,48", "89,49", "89,50", "89,51", "90,17", "90,18", "90,19", "90,48", "90,49", "90,50",
+            "90,51", "91,17", "91,18", "91,19", "91,20", "91,48", "91,49", "91,50", "91,51", "92,17",
+            "92,18", "92,19", "92,20", "92,21", "92,48", "92,49", "92,50", "92,51", "93,17", "93,18",
+            "93,19", "93,21", "93,48", "93,49", "93,50", "93,51", "94,17", "94,18", "94,21", "94,48",
+            "94,49", "94,50", "94,51", "95,17", "95,18", "95,19", "95,20", "95,21", "95,48", "95,49",
+            "96,17", "96,18", "96,20", "96,21", "96,48", "96,49", "96,51", "97,17", "97,19", "97,21",
+            "97,48", "97,49", "98,17", "98,18", "98,19", "98,20", "98,21", "98,48", "98,49", "99,48",
+            "99,49", "101,19", "101,20", "101,21", "101,22", "101,23", "101,24", "101,25", "102,18", "102,19",
+            "102,20", "102,21", "102,22", "102,23", "102,24", "102,25", "102,26", "103,19", "103,20", "103,21",
+            "103,22", "103,23", "103,24", "103,25", "103,26", "104,17", "104,18", "104,19", "104,20", "104,21",
+            "104,22", "104,23", "104,24", "104,25", "104,26", "105,17", "105,18", "105,19", "105,20", "105,21",
+            "105,22", "105,23", "105,24", "105,25", "105,26", "106,17", "106,18", "106,19", "106,20", "106,21",
+            "106,22", "106,23", "106,24", "106,25", "107,18", "107,19", "107,20", "107,21", "107,22", "107,23",
+            "107,24", "107,25", "107,26", "108,19", "108,20", "108,21", "108,22", "108,23", "108,24", "109,18",
+            "109,19", "109,20", "109,21", "109,22", "109,23", "109,24", "109,25", "110,18", "110,19", "110,20",
+            "110,21", "110,22", "110,23", "110,24", "110,25", "111,15", "111,16", "111,18", "111,19", "111,20",
+            "111,21", "111,22", "111,23", "111,25", "111,26", "112,16", "112,17", "112,18", "112,19", "112,20",
+            "112,21", "112,22", "112,23", "112,24", "112,25", "112,26", "113,17", "113,18", "113,19", "113,20",
+            "114,19", "114,20", "114,21", "114,22", "114,23", "114,24", "114,25", "114,26", "115,19", "115,20",
+            "115,21", "115,22", "115,23", "115,24", "115,25", "115,26", "116,24", "116,25", "117,24", "117,25",
+            "118,24", "118,25", "119,24", "119,25", "120,24", "120,25", "121,24", "121,25", "122,20", "122,21",
+            "122,22", "122,23", "122,24", "122,25", "122,28", "122,29", "122,30", "123,20", "123,21", "123,22",
+            "123,23", "123,24", "123,25", "123,26", "123,27", "123,28", "123,29", "123,30", "124,21", "124,22",
+            "124,23", "124,24", "124,25", "124,26", "124,28", "124,29", "124,30", "125,20", "125,21", "125,22",
+            "125,23", "125,24", "125,25", "125,26", "125,28", "125,29", "125,30", "126,20", "126,21", "126,22",
+            "126,23", "126,24", "126,25", "126,26", "126,28", "126,29", "126,30", "127,20", "127,21", "127,22",
+            "127,23", "127,24", "127,25", "127,26", "127,28", "127,29", "127,30", "128,20", "128,21", "128,22",
+            "128,23", "128,24", "128,25", "128,26", "128,28", "128,29", "128,30", "129,21", "129,22", "129,23",
+            "129,24", "129,25", "129,27", "129,28", "129,29", "130,21", "130,22", "130,23", "130,24", "130,25",
+            "131,21", "131,22", "131,23", "131,24", "131,25", "132,20", "132,21", "132,22", "132,23", "132,24",
+            "132,25", "133,20", "133,21", "133,22", "133,23", "133,24", "133,25", "134,20", "134,21", "134,22",
+            "134,23", "134,24", "134,25", "134,26", "135,20", "135,21", "135,22", "135,23", "135,24", "135,25",
+            "135,26", "136,21", "136,22", "136,23", "136,24", "136,25", "136,26", "137,19", "137,20", "137,21",
+            "137,22", "137,23", "137,24", "137,25", "138,18", "138,19", "138,20", "138,21", "138,22", "138,23",
+            "138,24", "138,25", "138,26", "139,16", "139,17", "139,18", "139,19", "139,20", "139,21", "139,22",
+            "139,23", "139,24", "139,25", "140,18", "140,19", "140,20", "140,21", "140,22", "140,23", "140,24",
+            "140,25", "141,17", "141,18", "141,19", "141,20", "141,21", "141,22", "141,23", "141,24", "141,25",
+            "142,17", "142,18", "142,19", "142,20", "142,21", "142,22", "142,23", "142,24", "142,25", "142,26",
+            "143,17", "143,18", "143,19", "143,20", "143,21", "143,22", "143,23", "143,24", "143,25", "144,18",
+            "144,19", "144,20", "144,21", "144,22", "144,23", "144,24", "144,25", "144,26", "145,17", "145,19",
+            "145,20", "145,21", "145,22", "145,23", "145,24", "145,25"));
+
     /**
      * Constructor único: siempre inicia en estado DIALOGUE.
      */
     public ScreenMapaTiled(Proyecto game) {
-        this(game, "Mapa/mapa11.tmx", null, null, null, GameState.DIALOGUE);
+        this(game, "Mapa/MAPACOMPLETO.tmx", null, null, null, GameState.DIALOGUE);
     }
 
     // Nuevo constructor que acepta el nombre del pokémon inicial (viene de la
     // pantalla de selección)
     public ScreenMapaTiled(Proyecto game, String initialPokemonName) {
-        this(game, "Mapa/mapa11.tmx", null, null, initialPokemonName, GameState.DIALOGUE);
+        this(game, "Mapa/MAPACOMPLETO.tmx", null, null, initialPokemonName, GameState.DIALOGUE);
+    }
+
+    public ScreenMapaTiled(Proyecto game, boolean isMultiplayer) {
+        this(game);
+        this.isMultiplayer = isMultiplayer;
+        if (isMultiplayer) {
+            initNetworking();
+        }
     }
 
     public ScreenMapaTiled(Proyecto game, String mapPath, Inventario inventory, Pokemon playerPokemon,
             String initialPokemonName, GameState initialState) {
-        this(game, mapPath, inventory, playerPokemon, initialPokemonName, initialState, null, null);
+        this(game, mapPath, inventory, playerPokemon, initialPokemonName, initialState, null, null, null, null, null);
     }
 
     // Constructor with custom spawn position
     public ScreenMapaTiled(Proyecto game, String mapPath, Inventario inventory, Pokemon playerPokemon,
             String initialPokemonName, GameState initialState, Float spawnX, Float spawnY) {
-        this(game, mapPath, inventory, playerPokemon, initialPokemonName, initialState, spawnX, spawnY, null);
+        this(game, mapPath, inventory, playerPokemon, initialPokemonName, initialState, spawnX, spawnY, null, null,
+                null);
     }
 
     // Full constructor with custom spawn position and source map
     public ScreenMapaTiled(Proyecto game, String mapPath, Inventario inventory, Pokemon playerPokemon,
             String initialPokemonName, GameState initialState, Float spawnX, Float spawnY, String sourceMap) {
+        this(game, mapPath, inventory, playerPokemon, initialPokemonName, initialState, spawnX, spawnY, sourceMap, null,
+                null);
+    }
+
+    // Constructor with everything (including return coordinates)
+    public ScreenMapaTiled(Proyecto game, String mapPath, Inventario inventory, Pokemon playerPokemon,
+            String initialPokemonName, GameState initialState, Float spawnX, Float spawnY, String sourceMap,
+            Float returnX, Float returnY) {
         this.game = game;
         this.mapPath = mapPath;
         this.currentState = initialState;
@@ -539,14 +653,62 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         this.customSpawnX = spawnX;
         this.customSpawnY = spawnY;
         this.sourceMapBeforePokemonCenter = sourceMap;
+        this.returnTileXBeforePokemonCenter = returnX;
+        this.returnTileYBeforePokemonCenter = returnY;
 
         if (inventory != null)
             this.playerInventory = inventory;
         if (playerPokemon != null)
             this.playerPokemon = playerPokemon;
 
-        // Iniciar conexión multijugador (si no está ya conectada)
-        sodyl.proyecto.net.NetworkClient.getInstance().connect();
+    }
+
+    // UNIDAD 9: PATRÓN OBSERVER / NETWORKING
+    // Al conectar, pasamos una 'Lambda' (función anónima) que se ejecutará cada vez
+    // que el servidor envíe un mensaje. Esto es una forma de implementar el patrón
+    // Observer.
+    private void initNetworking() {
+        String serverIP = "localhost";
+        conexion = new ConexionCliente(serverIP, 5000, message -> {
+            // UNIDAD 7: CONCURRENCIA E HILOS
+            // Los mensajes de red llegan en un hilo secundario de red.
+            // Gdx.app.postRunnable "pasa el mensaje" al hilo principal de renderizado (Hilo
+            // de LibGDX)
+            // para evitar errores de sincronización gráfica (Thread Safety).
+            Gdx.app.postRunnable(() -> handleNetworkMessage(message));
+        });
+        conexion.conectar();
+    }
+
+    private void handleNetworkMessage(String message) {
+        try {
+            JsonValue root = new JsonReader().parse(message);
+            String tipo = root.getString("tipo", "");
+            String id = root.getString("id", "");
+
+            if (id.equals(sodyl.proyecto.clases.UserManager.getCurrentUser()))
+                return;
+
+            if ("mover".equals(tipo)) {
+                float x = root.getFloat("x");
+                float y = root.getFloat("y");
+                Direction dir = Direction.valueOf(root.getString("dir", "DOWN"));
+                boolean moving = root.getBoolean("moving", false);
+
+                if (!otherPlayers.containsKey(id)) {
+                    otherPlayers.put(id, new OtherPlayer(id, x, y, dir, moving));
+                } else {
+                    otherPlayers.get(id).update(x, y, dir, moving);
+                }
+            } else if ("desconectar".equals(tipo)) {
+                if (otherPlayers.containsKey(id)) {
+                    otherPlayers.get(id).remove();
+                    otherPlayers.remove(id);
+                }
+            }
+        } catch (Exception e) {
+            Gdx.app.error("NETWORK", "Error parsing message: " + message, e);
+        }
     }
 
     // **CONSTRUCTOR ELIMINADO: public ScreenMapaTiled(Proyecto game, GameState
@@ -640,9 +802,13 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // --- Carga de Datos ---
         if (playerInventory == null) {
+            String currentUser = sodyl.proyecto.clases.UserManager.getCurrentUser();
+            Gdx.app.log("MAP_SCREEN", "Carga inicial. Usuario actual: " + currentUser);
             playerInventory = new Inventario();
             // Cargar inventario del usuario actual
-            playerInventory.load(sodyl.proyecto.clases.UserManager.getCurrentUser());
+            playerInventory.load(currentUser);
+            Gdx.app.log("MAP_SCREEN",
+                    "Carga de inventario completa. Tamaño: " + playerInventory.getAllObjetos().size());
         }
 
         // Cargar Pokedex
@@ -688,7 +854,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     if (!(layer instanceof com.badlogic.gdx.maps.MapGroupLayer)
                             && !(layer instanceof com.badlogic.gdx.maps.tiled.TiledMapTileLayer)) {
                         collisionObjectLayer = layer;
-                        Gdx.app.log("COLLISION", "Collision OBJECT layer found: " + layer.getName());
+                        Gdx.app.log("COLLISION", "Capa de OBJETOS de colisión encontrada: " + layer.getName());
                         break;
                     }
                 }
@@ -722,70 +888,25 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 } else if (object instanceof PolygonMapObject) {
                     // Handle polygon collisions (for diagonal walls, etc.)
                     // For now, we'll skip these but log them
-                    Gdx.app.log("COLLISION", "Polygon collision object found, skipping for now");
+                    Gdx.app.log("COLLISION", "Objeto de colisión poligonal encontrado, omitiendo por ahora");
                 }
             }
-            Gdx.app.log("COLLISION", "Loaded " + collisionRects.size + " collision rectangles");
+            Gdx.app.log("COLLISION", "Cargados " + collisionRects.size + " rectángulos de colisión");
         } else {
-            Gdx.app.log("COLLISION", "No collision OBJECT layer found in map");
+            Gdx.app.log("COLLISION", "No se encontró capa de OBJETOS de colisión en el mapa");
         }
 
-        if (mapPath.equals("Mapa/mapa11.tmx")) {
+        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
             // Ensure transition tile is free (Pokemon Center)
             removeCollisionsAt(38, 37);
             removeCollisionsAt(39, 37);
 
-            // Asegurar que la salida a Mapa 2 (tiles 0,17-21) esté libre de colisiones
-            // Coordenadas LibGDX: Y = 28 a 32
-            for (int y = 28; y <= 33; y++) {
-                removeCollisionsAt(0, y);
+            // Bloquear coordenadas antiguas de transición al Mapa 2 (tiles 0, 17-21)
+            // para evitar que el jugador intente transicionar a un mapa que ya no existe
+            for (int y = 17; y <= 21; y++) {
+                addCollisionAt(0, y);
             }
 
-            // Salida a Mapa 4 (tiles 22-27, 49)
-            for (int x = 22; x <= 27; x++) {
-                removeCollisionsAt(x, 49);
-            }
-        }
-
-        if (mapPath.equals("Mapa/MAPA 4.tmx")) {
-            // Entrada/Salida desde Mapa 1 (tiles 22-27, 0)
-            for (int x = 22; x <= 27; x++) {
-                removeCollisionsAt(x, 0);
-                removeCollisionsAt(x, 1); // Margen de seguridad
-            }
-        }
-
-        if (mapPath.equals("Mapa/Mapa2.tmx")) {
-            // Asegurar que la salida a Mapa 1 (borde derecho, x=49) esté libre de
-            // colisiones si es necesario
-            // Simplemente removemos colisiones en el borde derecho en un rango amplio
-            for (int y = 0; y < mapHeightTiles; y++) {
-                removeCollisionsAt(49, y);
-            }
-
-            // Ensure Pokemon Center entrance is free (tile 45, 28 and surrounding)
-            removeCollisionsAt(45, 28);
-            removeCollisionsAt(44, 28);
-            removeCollisionsAt(46, 28);
-
-            // --- AÑADIR COLISIONES MANUALES MAPA 2 ---
-            int[][] map2Tiles = {
-                    { 47, 28 }, { 43, 28 }, { 44, 30 }, { 44, 31 }, { 45, 31 }, { 46, 31 },
-                    { 47, 31 }, { 48, 31 }, { 49, 31 }, { 48, 28 },
-                    { 43, 44 }, { 44, 45 }, { 44, 46 }, { 44, 47 }, { 44, 48 }, { 44, 49 }, { 44, 50 }, { 44, 51 },
-                    { 44, 52 }, { 44, 53 }, { 44, 54 },
-                    { 45, 51 }, { 41, 52 }, { 40, 52 }, { 39, 52 }, { 37, 52 }, { 37, 50 }, { 40, 51 }, { 40, 50 },
-                    { 40, 49 }, { 40, 48 }, { 40, 47 },
-                    { 40, 46 }, { 40, 45 }, { 40, 45 }, { 40, 44 }, { 38, 44 }, { 38, 43 }, { 38, 42 }, { 38, 41 },
-                    { 38, 40 }, { 38, 39 }, { 38, 39 },
-                    { 39, 40 }, { 46, 43 }, { 46, 44 }, { 46, 45 }, { 46, 46 }, { 46, 47 }, { 46, 48 }, { 46, 49 },
-                    { 46, 50 }, { 46, 51 }, { 46, 52 },
-                    { 46, 53 }, { 46, 54 }, { 49, 23 }, { 49, 22 }, { 49, 21 }, { 49, 18 }, { 48, 18 }, { 47, 18 },
-                    { 46, 18 }
-            };
-            for (int[] tile : map2Tiles) {
-                addCollisionAt(tile[0], tile[1]);
-            }
         }
 
         // --- Configuración de Animaciones y Personaje ---
@@ -821,6 +942,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         } else if (mapPath.contains("Centro Pokemon interior")) {
             startX = 11f; // Adjusted to center the map view
             startY = 4f; // Spawn at lower tile, exit is above
+        } else if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+            // Spawn at tile 51, 18
+            float tileWidth = map.getProperties().get("tilewidth", Integer.class);
+            float tileHeight = map.getProperties().get("tileheight", Integer.class);
+            startX = 51 * tileWidth * UNIT_SCALE;
+            startY = 16 * tileHeight * UNIT_SCALE;
         }
 
         characterActor.setPosition(startX, startY);
@@ -842,45 +969,64 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             // Initial position off-screen (right)
             // We'll set size/position when animation starts, but good to have defaults
         } catch (Exception e) {
-            Gdx.app.error("ASSETS", "Could not load yoel.png", e);
+            Gdx.app.error("ASSETS", "No se pudo cargar yoel.png", e);
         }
 
         // --- INICIALIZACIÓN DE DATOS GLOBALES ---
         Objeto.initializeObjetos();
         Pokemones.initialize(); // Inicializar Pokémon
-        if (playerInventory == null)
-            playerInventory = new Inventario();
+        // playerInventory is already handled at the beginning of show()
 
         availableRecipes = new Array<>(Objeto.getAllRecipes().values().toArray(new Recipe[0]));
 
         loadItemTextures();
 
         // --- INICIALIZAR POKÉMON DEL JUGADOR ---
-        // Asignar automáticamente Rowlet como Pokémon inicial
         if (playerPokemon == null) {
+            java.util.List<Pokemon> team = sodyl.proyecto.clases.Pokedex.getTeam();
+
             if (this.initialPokemonName != null) {
-                playerPokemon = Pokemones.getPokemon(this.initialPokemonName);
-                // Nivel de investigación inicial: 2
-                playerPokemon.setNivel(2);
-                playerPokemon.actualizarAtributos();
+                // Try to find the specific requested pokemon in the team first
+                for (Pokemon p : team) {
+                    if (p.getEspecie().equals(this.initialPokemonName)) {
+                        playerPokemon = p;
+                        break;
+                    }
+                }
+                // If not in team, create it (Fallback/New)
+                if (playerPokemon == null) {
+                    playerPokemon = Pokemones.getPokemon(this.initialPokemonName);
+                    playerPokemon.setNivel(0);
+                    playerPokemon.actualizarAtributos();
+                }
             } else {
-                // Dar Rowlet por defecto
-                playerPokemon = Pokemones.getPokemon("Rowlet");
-                playerPokemon.setNivel(2);
-                playerPokemon.actualizarAtributos();
-                playerPokemon.setActualHP(playerPokemon.getMaxHp());
+                // No specific request, take first from team or default
+                if (!team.isEmpty()) {
+                    playerPokemon = team.get(0);
+                } else {
+                    // Fallback to Rowlet (Dummy for Intro)
+                    playerPokemon = Pokemones.getPokemon("Rowlet");
+                    playerPokemon.setNivel(0);
+                    playerPokemon.actualizarAtributos();
+                    playerPokemon.setActualHP(playerPokemon.getMaxHp());
+                }
             }
         }
 
-        // Registrar en la Pokedex
-        try {
-            sodyl.proyecto.clases.Pokedex.addSeen(playerPokemon.getEspecie());
-            sodyl.proyecto.clases.Pokedex.addCollected(playerPokemon);
-        } catch (Exception ignored) {
-        }
+        // Registrar en la Pokedex y dar items iniciales SOLO si es un juego nuevo Y se
+        // ha elegido un pokemon explícito
+        if (currentState == GameState.DIALOGUE) {
+            if (this.initialPokemonName != null) {
+                try {
+                    sodyl.proyecto.clases.Pokedex.addSeen(playerPokemon.getEspecie());
+                    sodyl.proyecto.clases.Pokedex.addCollected(playerPokemon);
+                } catch (Exception ignored) {
+                }
 
-        // Dar 5 Pokéballs al jugador al inicio
-        playerInventory.addObjeto(101, 5); // ID 101 = Pokeball
+                // Dar 5 Pokéballs al jugador al inicio (solo juego nuevo y tras elegir)
+                playerInventory.addObjeto(101, 5); // ID 101 = Pokeball
+            }
+        }
 
         // --- CARGAR RECEPCIONISTA (SOLO EN CENTRO POKEMON) ---
         if (mapPath.contains("Centro Pokemon interior")) {
@@ -909,391 +1055,43 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
         }
 
-        // --- CARGAR NPC CIRCUS BABY (Solo en Mapa 1) ---
-        if (mapPath.equals("Mapa/mapa11.tmx")) {
-            try {
-                circusBabyTexture1 = new Texture(Gdx.files.internal("imagenes/CircusBaby.png"));
-                circusBabyTexture2 = new Texture(Gdx.files.internal("imagenes/CircusBaby2.png"));
-
-                circusBabyActor = new Image(circusBabyTexture1);
-
-                // Posición Tile 27, 34
-                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
-                float tileHeight = map.getProperties().get("tileheight", Integer.class);
-                float npcX = 26 * tileWidth * UNIT_SCALE;
-                float npcY = 34 * tileHeight * UNIT_SCALE;
-
-                // Ajustar tamaño (Asumimos tamaño de personaje estándar o un poco más grande)
-                circusBabyActor.setSize(5f, 3f);
-                circusBabyActor.setPosition(npcX, npcY);
-
-                stage.addActor(circusBabyActor);
-
-                // Agregar Colisión Manualmente
-                Rectangle npcRect = new Rectangle(0f, 0f, 0f, 0f); // Ajustado para bloquear el paso
-                collisionRects.add(npcRect);
-
-                Gdx.app.log("NPC", "Circus Baby cargado en (27, 34)");
-            } catch (Exception e) {
-                Gdx.app.error("NPC", "No se pudo cargar CircusBaby.png", e);
-            }
-
-            // --- CARGAR NPC FUNTIME FREDDY (Solo en Mapa 1) ---
-            // --- FUNTIME FOXY NPC (ANIMATED) - TILE 16, 24 ---
-            try {
-                funtimeFoxyTexture1 = new Texture(Gdx.files.internal("imagenes/fntFoxy1.png"));
-                funtimeFoxyTexture2 = new Texture(Gdx.files.internal("imagenes/fntFoxy2.png"));
-
-                funtimeFoxyActor = new Image(funtimeFoxyTexture1); // Start with frame 1
-
-                // Posición Tile 16, 24
-                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
-                float tileHeight = map.getProperties().get("tileheight", Integer.class);
-
-                float npcX = 16 * tileWidth * UNIT_SCALE;
-                float npcY = 24 * tileHeight * UNIT_SCALE;
-
-                // Ajustar tamaño para que luzca bien
-                funtimeFoxyActor.setSize(5f, 3f);
-                // Adjust position manually as requested previously
-                funtimeFoxyActor.setPosition(npcX - 1f, npcY);
-
-                stage.addActor(funtimeFoxyActor);
-
-                // Add collision at proper NPC spot
-                Rectangle npcRect = new Rectangle(0f, 0f, 0f, 0f);
-                collisionRects.add(npcRect);
-
-                Gdx.app.log("NPC", "Funtime Foxy (Animated) loaded at (16, 24)");
-            } catch (Exception e) {
-                Gdx.app.error("ASSETS", "Could not load FuntimeFoxy images", e);
-            }
-
-            // --- FUNTIME FREDDY NPC (ANIMATED) - TILE 23, 13 ---
-            try {
-                funtimeFreddyTexture1 = new Texture(Gdx.files.internal("imagenes/FuntimeFreddy.png"));
-                funtimeFreddyTexture2 = new Texture(Gdx.files.internal("imagenes/FuntimeFreddy2.png"));
-
-                funtimeFreddyActor = new Image(funtimeFreddyTexture1); // Start with frame 1
-
-                // Posición Tile 23, 13
-                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
-                float tileHeight = map.getProperties().get("tileheight", Integer.class);
-
-                float npcX = 19 * tileWidth * UNIT_SCALE;
-                float npcY = 13 * tileHeight * UNIT_SCALE;
-
-                // Ajustar tamaño para que luzca bien
-                funtimeFreddyActor.setSize(5f, 3f);
-                funtimeFreddyActor.setPosition(npcX, npcY);
-
-                stage.addActor(funtimeFreddyActor);
-
-                // Add collision at proper NPC spot
-                Rectangle npcRect = new Rectangle(npcX, npcY, 0f, 0f);
-                collisionRects.add(npcRect);
-
-                Gdx.app.log("NPC", "Funtime Freddy (Animated) loaded at (23, 13)");
-            } catch (Exception e) {
-                Gdx.app.error("ASSETS", "Could not load FuntimeFreddy images", e);
-            }
-        }
-
-        // --- CARGAR NPCs PARA MAPA 2 (BATTLE NPCs) ---
-        if (mapPath.equals("Mapa/Mapa2.tmx")) {
-            float tileWidth = map.getProperties().get("tilewidth", Integer.class);
-            float tileHeight = map.getProperties().get("tileheight", Integer.class);
-
-            // --- GIORNO NPC (ANIMATED) - TILE 4, 51 ---
-            try {
-                giornoTexture1 = new Texture(Gdx.files.internal("spritesMapa2/giorno1.png"));
-                giornoTexture2 = new Texture(Gdx.files.internal("spritesMapa2/giorno2.png"));
-
-                giornoActor = new Image(giornoTexture1);
-
-                float npcX = 4 * tileWidth * UNIT_SCALE;
-                float npcY = 51 * tileHeight * UNIT_SCALE;
-
-                giornoActor.setSize(6f, 4f);
-                giornoActor.setPosition(npcX, npcY);
-
-                stage.addActor(giornoActor);
-
-                // Add collision rectangle for the tile
-                Rectangle npcRect = new Rectangle(npcX, npcY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE);
-                collisionRects.add(npcRect);
-
-                Gdx.app.log("NPC", "Giorno (Battle NPC) loaded at (4, 51)");
-            } catch (Exception e) {
-                Gdx.app.error("ASSETS", "Could not load Giorno images", e);
-            }
-
-            // --- JOTARO NPC (ANIMATED) - TILE 11, 33 ---
-            try {
-                jotaroTexture1 = new Texture(Gdx.files.internal("spritesMapa2/jotaro1.png"));
-                jotaroTexture2 = new Texture(Gdx.files.internal("spritesMapa2/jotaro2.png"));
-
-                jotaroActor = new Image(jotaroTexture1);
-
-                float npcX = 10 * tileWidth * UNIT_SCALE;
-                float npcY = 33 * tileHeight * UNIT_SCALE;
-
-                jotaroActor.setSize(6f, 4f);
-                jotaroActor.setPosition(npcX, npcY);
-
-                stage.addActor(jotaroActor);
-
-                // Add collision rectangle for the tile
-                Rectangle npcRect = new Rectangle(npcX, npcY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE);
-                collisionRects.add(npcRect);
-
-                Gdx.app.log("NPC", "Jotaro (Battle NPC) loaded at (10, 33)");
-            } catch (Exception e) {
-                Gdx.app.error("ASSETS", "Could not load Jotaro images", e);
-            }
-
-            // --- KANEKI NPC (ANIMATED) - TILE 42, 44 ---
-            try {
-                kanekiTexture1 = new Texture(Gdx.files.internal("spritesMapa2/kaneki1.png"));
-                kanekiTexture2 = new Texture(Gdx.files.internal("spritesMapa2/kaneki2.png"));
-
-                kanekiActor = new Image(kanekiTexture1);
-
-                float npcX = 41 * tileWidth * UNIT_SCALE;
-                float npcY = 44 * tileHeight * UNIT_SCALE;
-
-                kanekiActor.setSize(6f, 4f);
-                kanekiActor.setPosition(npcX, npcY);
-
-                stage.addActor(kanekiActor);
-
-                // Add collision rectangle for the tile
-                Rectangle npcRect = new Rectangle(npcX, npcY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE);
-                collisionRects.add(npcRect);
-
-                Gdx.app.log("NPC", "Kaneki (Battle NPC) loaded at (41, 44)");
-            } catch (Exception e) {
-                Gdx.app.error("ASSETS", "Could not load Kaneki images", e);
-            }
-
-            // --- FREDDY NPC (INFO) - TILE 29, 29 ---
-            try {
-                freddyMap2Texture1 = new Texture(Gdx.files.internal("spritesMapa2/freddy1.png"));
-                freddyMap2Texture2 = new Texture(Gdx.files.internal("spritesMapa2/freddy2.png"));
-                freddyMap2Texture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-                freddyMap2Texture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-
-                freddyMap2Actor = new Image(new TextureRegionDrawable(new TextureRegion(freddyMap2Texture1)));
-                freddyMap2Actor.setSize(6f, 4f);
-
-                float fX = 29 * tileWidth * UNIT_SCALE;
-                float fY = 29 * tileHeight * UNIT_SCALE;
-                freddyMap2Actor.setPosition(fX, fY);
-
-                stage.addActor(freddyMap2Actor);
-
-                // Add collision
-                collisionRects.add(new Rectangle(fX, fY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
-                Gdx.app.log("NPC", "Freddy Map 2 loaded at (29, 29)");
-
-            } catch (Exception e) {
-                Gdx.app.error("NPC", "Error loading Freddy Map 2 NPC", e);
-            }
-        }
-
-        // --- CARGAR NPCs PARA MAPA 3 ---
-        if (mapPath.equals("Mapa/MAPA3.tmx")) {
-            float tileWidth = map.getProperties().get("tilewidth", Integer.class);
-            float tileHeight = map.getProperties().get("tileheight", Integer.class);
-
-            // --- PENNYWISE NPC (ANIMATED) - TILE 14, 23 ---
-            try {
-                pennywiseTexture1 = new Texture(Gdx.files.internal("spritesMapa3/pennywise1.png"));
-                pennywiseTexture2 = new Texture(Gdx.files.internal("spritesMapa3/pennywise2.png"));
-
-                pennywiseActor = new Image(pennywiseTexture1);
-
-                float npcX = 14 * tileWidth * UNIT_SCALE;
-                float npcY = 23 * tileHeight * UNIT_SCALE;
-
-                pennywiseActor.setSize(6f, 4f);
-                pennywiseActor.setPosition(npcX, npcY);
-
-                stage.addActor(pennywiseActor);
-
-                // Add collision rectangle for the tile
-                Rectangle npcRect = new Rectangle(npcX, npcY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE);
-                collisionRects.add(npcRect);
-
-                Gdx.app.log("NPC", "Pennywise loaded at (14, 23)");
-            } catch (Exception e) {
-                Gdx.app.error("ASSETS", "Could not load Pennywise images", e);
-            }
-
-            // --- DON VALERIO NPC (ANIMATED) - TILE 44, 30 ---
-            try {
-                donValerioTexture1 = new Texture(Gdx.files.internal("spritesMapa3/donValerio1.png"));
-                donValerioTexture2 = new Texture(Gdx.files.internal("spritesMapa3/donValerio2.png"));
-
-                donValerioActor = new Image(donValerioTexture1);
-
-                float npcX = 44 * tileWidth * UNIT_SCALE;
-                float npcY = 30 * tileHeight * UNIT_SCALE;
-
-                donValerioActor.setSize(6f, 4f);
-                donValerioActor.setPosition(npcX, npcY);
-
-                stage.addActor(donValerioActor);
-
-                // Add collision rectangle for the tile
-                Rectangle npcRect = new Rectangle(npcX, npcY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE);
-                collisionRects.add(npcRect);
-
-                Gdx.app.log("NPC", "Don Valerio loaded at (44, 30)");
-            } catch (Exception e) {
-                Gdx.app.error("ASSETS", "Could not load Don Valerio images", e);
-            }
-
-            // --- BONNIE NPC (INFO) - TILE 2, 28 ---
-            try {
-                bonnieTexture1 = new Texture(Gdx.files.internal("spritesMapa3/bonnie1.png"));
-                bonnieTexture2 = new Texture(Gdx.files.internal("spritesMapa3/bonnie2.png"));
-                bonnieTexture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-                bonnieTexture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-
-                bonnieActor = new Image(new TextureRegionDrawable(new TextureRegion(bonnieTexture1)));
-                bonnieActor.setSize(6f, 4f);
-
-                float iX = 4 * tileWidth * UNIT_SCALE;
-                float iY = 28 * tileHeight * UNIT_SCALE;
-                bonnieActor.setPosition(iX, iY);
-
-                stage.addActor(bonnieActor);
-
-                // Add collision
-                collisionRects.add(new Rectangle(iX, iY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
-                Gdx.app.log("NPC", "Bonnie loaded at (3, 28)");
-
-            } catch (Exception e) {
-                Gdx.app.error("NPC", "Error loading Bonnie NPC", e);
-            }
-        }
-
-        // --- MAP 4 NPCS ---
-        if (mapPath.equals("Mapa/MAPA 4.tmx")) {
-            // Jesucristo - Tile (35, 29)
-            try {
-                jesucristoTexture1 = new Texture(Gdx.files.internal("spritesMapa4/jesucristo1.png"));
-                jesucristoTexture2 = new Texture(Gdx.files.internal("spritesMapa4/jesucristo2.png"));
-                // Set filters
-                jesucristoTexture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-                jesucristoTexture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-
-                jesucristoActor = new Image(new TextureRegionDrawable(new TextureRegion(jesucristoTexture1)));
-                jesucristoActor.setSize(6f, 4f); // Adjust size relative to UNIT_SCALE
-
-                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
-                float tileHeight = map.getProperties().get("tileheight", Integer.class);
-
-                float jX = 0 * tileWidth * UNIT_SCALE;
-                float jY = 4 * tileHeight * UNIT_SCALE;
-                jesucristoActor.setPosition(jX, jY);
-
-                stage.addActor(jesucristoActor);
-
-                // Add collision
-                collisionRects.add(new Rectangle(1 * tileWidth * UNIT_SCALE, 4 * tileHeight * UNIT_SCALE,
-                        tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
-                collisionRects.add(new Rectangle(1 * tileWidth * UNIT_SCALE, 5 * tileHeight * UNIT_SCALE,
-                        tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
-                Gdx.app.log("NPC", "Jesucristo loaded at (0, 4) with collisions at (1, 4) and (1, 5)");
-
-            } catch (Exception e) {
-                Gdx.app.error("NPC", "Error loading Jesucristo NPC", e);
-            }
-
-            // Afton - Tile (44, 38)
-            try {
-                aftonTexture1 = new Texture(Gdx.files.internal("spritesMapa4/afton1.png"));
-                aftonTexture2 = new Texture(Gdx.files.internal("spritesMapa4/afton2.png"));
-
-                aftonTexture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-                aftonTexture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-
-                aftonActor = new Image(new TextureRegionDrawable(new TextureRegion(aftonTexture1)));
-                aftonActor.setSize(6f, 4f);
-
-                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
-                float tileHeight = map.getProperties().get("tileheight", Integer.class);
-
-                float aX = 45 * tileWidth * UNIT_SCALE;
-                float aY = 4 * tileHeight * UNIT_SCALE;
-                aftonActor.setPosition(aX, aY);
-
-                stage.addActor(aftonActor);
-
-                // Add collision
-                collisionRects.add(new Rectangle(46 * tileWidth * UNIT_SCALE, 4 * tileHeight * UNIT_SCALE,
-                        tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
-                collisionRects.add(new Rectangle(46 * tileWidth * UNIT_SCALE, 5 * tileHeight * UNIT_SCALE,
-                        tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
-                Gdx.app.log("NPC", "Afton loaded at (45, 4) with collisions at (46, 4) and (46, 5)");
-
-            } catch (Exception e) {
-                Gdx.app.error("NPC", "Error loading Afton NPC", e);
-            }
-
-            // Info NPC - Tile (19, 12)
-            try {
-                map4InfoNpcTexture1 = new Texture(Gdx.files.internal("spritesMapa4/foxy1.png"));
-                map4InfoNpcTexture2 = new Texture(Gdx.files.internal("spritesMapa4/foxy2.png"));
-                map4InfoNpcTexture1.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-                map4InfoNpcTexture2.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-
-                map4InfoNpcActor = new Image(new TextureRegionDrawable(new TextureRegion(map4InfoNpcTexture1)));
-                map4InfoNpcActor.setSize(6f, 4f);
-
-                float tileWidth = map.getProperties().get("tilewidth", Integer.class);
-                float tileHeight = map.getProperties().get("tileheight", Integer.class);
-
-                float iX = 21 * tileWidth * UNIT_SCALE;
-                float iY = 12 * tileHeight * UNIT_SCALE;
-                map4InfoNpcActor.setPosition(iX, iY);
-
-                stage.addActor(map4InfoNpcActor);
-
-                // Add collision
-                collisionRects.add(new Rectangle(iX, iY, tileWidth * UNIT_SCALE, tileHeight * UNIT_SCALE));
-                Gdx.app.log("NPC", "Map 4 Info NPC loaded at (20, 12)");
-
-            } catch (Exception e) {
-                Gdx.app.error("NPC", "Error loading Map 4 Info NPC", e);
-            }
-        }
-
         // --- CARGAR ZONAS DE ENCUENTRO ---
         encounterZones = new Array<>();
 
         loadEncounterZones();
 
         // --- INICIALIZACIÓN DE OBJETOS RECOLECTABLES (SPAWN EN TILES DE HIERBA) ---
-        collectibles = new Array<>();
-        if (currentState != GameState.DIALOGUE)
+        if (game.getMapCollectibles().containsKey(mapPath)) {
+            collectibles = game.getMapCollectibles().get(mapPath);
+            Gdx.app.log("COLLECTIBLES",
+                    "Cargados " + collectibles.size + " coleccionables persistentes para " + mapPath);
+        } else {
+            collectibles = new Array<>();
+            game.getMapCollectibles().put(mapPath, collectibles);
+            if (!mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+                spawnCollectiblesOnGrassTiles(100);
+            } else {
+                spawnPrimaryMaterialsInZones(20);
+            }
+            Gdx.app.log("COLLECTIBLES", "Generados " + collectibles.size + " nuevos coleccionables para " + mapPath);
+        }
 
-        {
-            spawnCollectiblesOnGrassTiles(60);
+        // Add non-collected persistent items to stage
+        for (Collectible c : collectibles) {
+            if (!c.isCollected()) {
+                stage.addActor(c.getActor());
+            }
         }
 
         stage.addActor(characterActor);
 
         // --- INICIALIZAR MENÚ DE PAUSA, DIÁLOGO, CRAFTEO E INVENTARIO ---
+        initializeDialogueNPCs();
         initializePauseMenu();
-
-        initializeCraftingMenu();
-
         initializeInventoryMenu();
-
+        initializeCraftingMenu();
         initializePokedexMenu();
+        initializePokemonesMenu();
 
         initializeInventorySubmenu(); // Nuevo Submenú
 
@@ -1315,7 +1113,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         multiplexer.addProcessor(this);
         multiplexer.addProcessor(uiStage);
 
-        if (currentState == GameState.DIALOGUE && mapPath.equals("Mapa/mapa11.tmx")) {
+        if (currentState == GameState.DIALOGUE && mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
             // Check if it's the very first dialogue (Professor Yoel intro)
             // We can check if dialogueQueue is empty (it hasn't been filled yet) or just by
             // context
@@ -1333,8 +1131,131 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         camera.viewportHeight = 25;
 
         clampCamera();
+        loadBattleNPCs();
         camera.update();
 
+    }
+
+    private void loadBattleNPCs() {
+        if (!mapPath.equals("Mapa/MAPACOMPLETO.tmx"))
+            return;
+
+        // Kaneki (Map 2, Tile 42, 39)
+        kaneki1Texture = new Texture(Gdx.files.internal("spritesMapa2/kaneki1.png"));
+        kaneki2Texture = new Texture(Gdx.files.internal("spritesMapa2/kaneki2.png"));
+        kanekiImage = new Image(kaneki1Texture);
+        kanekiImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        kanekiImage.setPosition(41 * 16 * UNIT_SCALE, 38 * 16 * UNIT_SCALE);
+        stage.addActor(kanekiImage);
+
+        // Jesucristo (Map 4, Tile 52, 49)
+        jesucristo1Texture = new Texture(Gdx.files.internal("spritesMapa4/jesucristo1.png"));
+        jesucristo2Texture = new Texture(Gdx.files.internal("spritesMapa4/jesucristo2.png"));
+        jesucristoImage = new Image(jesucristo1Texture);
+        jesucristoImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        jesucristoImage.setPosition(50 * 16 * UNIT_SCALE, 50 * 16 * UNIT_SCALE);
+        stage.addActor(jesucristoImage);
+
+        // William Afton (Map 4, Tile 87, 51)
+        afton1Texture = new Texture(Gdx.files.internal("spritesMapa4/afton1.png"));
+        afton2Texture = new Texture(Gdx.files.internal("spritesMapa4/afton2.png"));
+        aftonImage = new Image(afton1Texture);
+        aftonImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        aftonImage.setPosition(86 * 16 * UNIT_SCALE, 51 * 16 * UNIT_SCALE);
+        stage.addActor(aftonImage);
+
+        // Pennywise (Map 3, Tile 100, 26)
+        pennywise1Texture = new Texture(Gdx.files.internal("spritesMapa3/pennywise1.png"));
+        pennywise2Texture = new Texture(Gdx.files.internal("spritesMapa3/pennywise2.png"));
+        pennywiseImage = new Image(pennywise1Texture);
+        pennywiseImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        pennywiseImage.setPosition(99 * 16 * UNIT_SCALE, 26 * 16 * UNIT_SCALE);
+        stage.addActor(pennywiseImage);
+
+        // Jotaro (Map 2, Tile 11, 27)
+        jotaro1Texture = new Texture(Gdx.files.internal("spritesMapa2/jotaro1.png"));
+        jotaro2Texture = new Texture(Gdx.files.internal("spritesMapa2/jotaro2.png"));
+        jotaroImage = new Image(jotaro1Texture);
+        jotaroImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        jotaroImage.setPosition(10 * 16 * UNIT_SCALE, 27 * 16 * UNIT_SCALE);
+        stage.addActor(jotaroImage);
+
+        // Don Valerio (Map 3, Tile 144, 22)
+        donValerio1Texture = new Texture(Gdx.files.internal("spritesMapa3/donValerio1.png"));
+        donValerio2Texture = new Texture(Gdx.files.internal("spritesMapa3/donValerio2.png"));
+        donValerioImage = new Image(donValerio1Texture);
+        donValerioImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        donValerioImage.setPosition(143 * 16 * UNIT_SCALE, 22 * 16 * UNIT_SCALE);
+        stage.addActor(donValerioImage);
+
+        // Giorno (Map 2, Tile 28, 38)
+        giorno1Texture = new Texture(Gdx.files.internal("spritesMapa2/giorno1.png"));
+        giorno2Texture = new Texture(Gdx.files.internal("spritesMapa2/giorno2.png"));
+        giornoImage = new Image(giorno1Texture);
+        giornoImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        giornoImage.setPosition(27 * 16 * UNIT_SCALE, 38 * 16 * UNIT_SCALE);
+        stage.addActor(giornoImage);
+
+        // Collision rectangles
+        collisionRects.add(new Rectangle(41 * 16 * UNIT_SCALE, 38 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+        collisionRects.add(new Rectangle(51 * 16 * UNIT_SCALE, 50 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+        collisionRects.add(new Rectangle(87 * 16 * UNIT_SCALE, 51 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+        collisionRects
+                .add(new Rectangle(100 * 16 * UNIT_SCALE, 26 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+        collisionRects.add(new Rectangle(10 * 16 * UNIT_SCALE, 27 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+        collisionRects
+                .add(new Rectangle(144 * 16 * UNIT_SCALE, 22 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+        collisionRects.add(new Rectangle(28 * 16 * UNIT_SCALE, 38 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+    }
+
+    private void initializeDialogueNPCs() {
+        if (!mapPath.equals("Mapa/MAPACOMPLETO.tmx"))
+            return;
+
+        // Bonnie (30, 26)
+        bonnie1Texture = new Texture(Gdx.files.internal("spritesMapa2/bonnie1.png"));
+        bonnie2Texture = new Texture(Gdx.files.internal("spritesMapa2/bonnie2.png"));
+        bonnieImage = new Image(bonnie1Texture);
+        bonnieImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        bonnieImage.setPosition(30 * 16 * UNIT_SCALE, 26 * 16 * UNIT_SCALE);
+        stage.addActor(bonnieImage);
+        collisionRects.add(new Rectangle(31 * 16 * UNIT_SCALE, 26 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+
+        // Funtime Foxy (65, 26)
+        fntFoxy1Texture = new Texture(Gdx.files.internal("imagenes/fntFoxy1.png"));
+        fntFoxy2Texture = new Texture(Gdx.files.internal("imagenes/fntFoxy2.png"));
+        fntFoxyImage = new Image(fntFoxy1Texture);
+        fntFoxyImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        fntFoxyImage.setPosition(64 * 16 * UNIT_SCALE, 26 * 16 * UNIT_SCALE);
+        stage.addActor(fntFoxyImage);
+        collisionRects.add(new Rectangle(65 * 16 * UNIT_SCALE, 26 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+
+        // Circus Baby (75, 30)
+        circusBaby1Texture = new Texture(Gdx.files.internal("imagenes/CircusBaby.png"));
+        circusBaby2Texture = new Texture(Gdx.files.internal("imagenes/CircusBaby2.png"));
+        circusBabyImage = new Image(circusBaby1Texture);
+        circusBabyImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        circusBabyImage.setPosition(75 * 16 * UNIT_SCALE, 30 * 16 * UNIT_SCALE);
+        stage.addActor(circusBabyImage);
+        collisionRects.add(new Rectangle(76 * 16 * UNIT_SCALE, 30 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+
+        // Foxy (77, 50)
+        foxy1Texture = new Texture(Gdx.files.internal("spritesMapa4/foxy1.png"));
+        foxy2Texture = new Texture(Gdx.files.internal("spritesMapa4/foxy2.png"));
+        foxyImage = new Image(foxy1Texture);
+        foxyImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        foxyImage.setPosition(77 * 16 * UNIT_SCALE, 50 * 16 * UNIT_SCALE);
+        stage.addActor(foxyImage);
+        collisionRects.add(new Rectangle(78 * 16 * UNIT_SCALE, 50 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
+
+        // Freddy (93, 20)
+        freddy1Texture = new Texture(Gdx.files.internal("spritesMapa3/freddy1.png"));
+        freddy2Texture = new Texture(Gdx.files.internal("spritesMapa3/freddy2.png"));
+        freddyImage = new Image(freddy1Texture);
+        freddyImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
+        freddyImage.setPosition(93 * 16 * UNIT_SCALE, 20 * 16 * UNIT_SCALE);
+        stage.addActor(freddyImage);
+        collisionRects.add(new Rectangle(94 * 16 * UNIT_SCALE, 20 * 16 * UNIT_SCALE, 16 * UNIT_SCALE, 16 * UNIT_SCALE));
     }
 
     private void loadItemTextures() {
@@ -1444,7 +1365,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             if (flowerLayer.getHeight() > 0 && flowerLayer.getWidth() > 0) {
                 Cell sampleCell = flowerLayer.getCell(0, 0);
                 if (sampleCell != null && sampleCell.getTile() != null) {
-                    Gdx.app.log("ENCOUNTER", "Ejemplo de ID de tile encontrado: " + sampleCell.getTile().getId());
+
                 }
             }
         }
@@ -1489,71 +1410,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         float playerX = characterActor.getX() + characterActor.getWidth() / 2;
         float playerY = characterActor.getY() + characterActor.getHeight() / 2;
 
-        // --- LÓGICA MAPA 2 ---
-        if (mapPath.equals("Mapa/Mapa2.tmx")) {
-            for (MapLayer mapLayer : map.getLayers()) {
-                if (mapLayer instanceof TiledMapTileLayer) {
-                    TiledMapTileLayer layer = (TiledMapTileLayer) mapLayer;
-                    int tileX = (int) (playerX / (layer.getTileWidth() * UNIT_SCALE));
-                    int tileY = (int) (playerY / (layer.getTileHeight() * UNIT_SCALE));
-                    Cell cell = layer.getCell(tileX, tileY);
-
-                    if (cell != null && cell.getTile() != null) {
-                        int tileId = cell.getTile().getId();
-                        // Gdx.app.log("SPAWN_DEBUG", "Mapa 2 - Tile: " + tileId);
-
-                        if (VALID_POKEMON_TILES_MAP2.contains(tileId)) {
-                            if (random.nextFloat() < 0.02f) {
-                                Gdx.app.log("SPAWN", "¡Encuentro activado en Mapa 2 (Tile " + tileId + ")!");
-                                startBattle(null);
-                                return; // Stop checking other layers if battle triggered
-                            }
-                        }
-                    }
-                }
-            }
-            return; // Don't run Map 1 logic
-        }
-
-        // --- LÓGICA MAPA 3 ---
-        if (mapPath.equals("Mapa/MAPA3.tmx")) {
-            int tileX = (int) (playerX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
-            int tileY = (int) (playerY / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
-            String coords = tileX + "," + tileY;
-
-            if (VALID_SPAWN_COORDS_MAP3.contains(coords)) {
-                if (random.nextFloat() < 0.05f) { // 5% chance per step on valid coordinates
-                    Gdx.app.log("SPAWN", "¡Encuentro activado en Mapa 3 (Coords " + coords + ")!");
-                    startBattle(null);
-                }
-            }
-            return;
-        }
-
-        // --- LÓGICA MAPA 4 ---
-        if (mapPath.equals("Mapa/MAPA 4.tmx")) {
-            int tileX = (int) (playerX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
-            int tileY = (int) (playerY / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
-            String coords = tileX + "," + tileY;
-
-            boolean zone1 = VALID_SPAWN_COORDS_MAP4_ZONE1.contains(coords);
-            boolean zone2 = VALID_SPAWN_COORDS_MAP4_ZONE2.contains(coords);
-
-            if (zone1 || zone2) {
-                if (random.nextFloat() < 0.05f) { // 5% chance per step on valid coordinates
-                    if (zone1) {
-                        pendingBattleBackground = "Mapa/fondoBatalla.jpg";
-                    } else {
-                        pendingBattleBackground = "Mapa/fondoBatalla3.png";
-                    }
-                    Gdx.app.log("SPAWN",
-                            "¡Encuentro activado en Mapa 4 (Coords " + coords + ")! BG: " + pendingBattleBackground);
-                    startBattle(null);
-                }
-            }
-            return;
-        }
-
         // --- LÓGICA MAPA 1 (EXISTENTE) ---
         TiledMapTileLayer layer = (TiledMapTileLayer) map.getLayers().get("NIvel 1");
         if (layer == null) {
@@ -1575,6 +1431,39 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         int tileX = (int) (playerX / (layer.getTileWidth() * UNIT_SCALE));
         int tileY = (int) (playerY / (layer.getTileHeight() * UNIT_SCALE));
 
+        // --- LÓGICA DE ENCUENTROS ESPECIALES (POR COORDENADAS) ---
+        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+            if (!checkTeamHealth())
+                return; // No iniciar encuentros si no hay salud
+
+            String coordKey = tileX + "," + tileY;
+            if (SPECIAL_ENCOUNTER_TILES_MAP1.contains(coordKey)) {
+                if (random.nextFloat() < 0.05f) {
+
+                    startSpecialBattle(1);
+                    return;
+                }
+            } else if (SPECIAL_ENCOUNTER_TILES_MAP1_ZONE2.contains(coordKey)) {
+                if (random.nextFloat() < 0.05f) {
+
+                    startSpecialBattle(2);
+                    return;
+                }
+            } else if (SPECIAL_ENCOUNTER_TILES_MAP1_ZONE3.contains(coordKey)) {
+                if (random.nextFloat() < 0.05f) {
+
+                    startSpecialBattle(3);
+                    return;
+                }
+            } else if (SPECIAL_ENCOUNTER_TILES_MAP1_ZONE4.contains(coordKey)) {
+                if (random.nextFloat() < 0.05f) {
+
+                    startSpecialBattle(4);
+                    return;
+                }
+            }
+        }
+
         Cell cell = layer.getCell(tileX, tileY);
 
         if (cell != null && cell.getTile() != null) {
@@ -1584,8 +1473,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             // + ", " + tileY + ")");
 
             if (VALID_POKEMON_TILES.contains(tileId)) {
+                if (!checkTeamHealth())
+                    return; // No iniciar encuentros si no hay salud
                 if (random.nextFloat() < 0.02f) {
-                    Gdx.app.log("SPAWN", "¡Encuentro activado en Tile ID: " + tileId + "!");
+
                     startBattle(null);
                 }
             }
@@ -1619,15 +1510,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // Los Pokémon salvajes aparecen en nivel aleatorio entre 1 y 3 (para batallas
         // más justas)
-        int randomLevel = 1 + random.nextInt(3); // 1 to 3
-        enemyPokemon.setNivel(randomLevel);
+        // Los Pokémon salvajes siempre aparecen en nivel 2
+        enemyPokemon.setNivel(2);
         enemyPokemon.actualizarAtributos();
         enemyPokemon.setActualHP(enemyPokemon.getMaxHp());
-
-        // Asegurar que el Pokémon del jugador esté en buen estado
-        if (playerPokemon.getActualHP() <= 0) {
-            playerPokemon.setActualHP(playerPokemon.getMaxHp());
-        }
 
         // Schedule dialog + pending enemy; actual battle will start after the player
         // closes the dialog
@@ -1644,11 +1530,73 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         currentState = GameState.DIALOGUE;
     }
 
+    /**
+     * Inicia una batalla con un Pokémon seleccionado de un pool con probabilidades
+     * específicas
+     * dependiendo de la zona.
+     */
+    private void startSpecialBattle(int zoneNumber) {
+        if (playerPokemon == null)
+            return;
+
+        List<String> pool = new ArrayList<>();
+        if (zoneNumber == 1) {
+            // Zona 1 (Rowlet, Ivysaur, Pikachu, Serperior)
+            addCopies(pool, "Rowlet", 45);
+            addCopies(pool, "Ivysaur", 40);
+            addCopies(pool, "Pikachu", 35);
+            addCopies(pool, "Serperior", 25);
+            pendingBattleBackground = "Mapa/fondoBatalla.jpg";
+        } else if (zoneNumber == 2) {
+            // Zona 2 (Cyndaquil, Flareon, Charizard, Gyarados)
+            addCopies(pool, "Cyndaquil", 45);
+            addCopies(pool, "Flareon", 40);
+            addCopies(pool, "Charizard", 25);
+            addCopies(pool, "Gyarados", 20);
+            pendingBattleBackground = "Mapa/fondoBatalla3.png";
+        } else if (zoneNumber == 3) {
+            // Zona 3 (Oshawott, Vaporeon, Sylveon, Blastoise)
+            addCopies(pool, "Oshawott", 45);
+            addCopies(pool, "Vaporeon", 40);
+            addCopies(pool, "Sylveon", 30);
+            addCopies(pool, "Blastoise", 25);
+            pendingBattleBackground = "Mapa/fondoBatalla2.png.png";
+        } else if (zoneNumber == 4) {
+            // Zona 4 (Flareon, Ivysaur, Vaporeon, Jolteon)
+            addCopies(pool, "Flareon", 30);
+            addCopies(pool, "Ivysaur", 30);
+            addCopies(pool, "Vaporeon", 30);
+            addCopies(pool, "Jolteon", 30);
+            pendingBattleBackground = "Mapa/fondoBatalla5.png";
+        }
+
+        String enemyPokemonName = pool.get(random.nextInt(pool.size()));
+        Pokemon enemyPokemon = Pokemones.getPokemon(enemyPokemonName);
+
+        if (enemyPokemon == null)
+            return;
+
+        // Los Pokémon salvajes especiales siempre aparecen en nivel 2
+        enemyPokemon.setNivel(2);
+        enemyPokemon.actualizarAtributos();
+        enemyPokemon.setActualHP(enemyPokemon.getMaxHp());
+
+        String msg = "¡Un " + enemyPokemon.getEspecie() + " salvaje ha aparecido!";
+        this.pendingEnemyForBattle = enemyPokemon;
+
+        if (dialogueQueue == null)
+            dialogueQueue = new LinkedList<>();
+        dialogueQueue.clear();
+        dialogueQueue.add(msg);
+        dialogBox.setText(dialogueQueue.poll());
+        currentState = GameState.DIALOGUE;
+    }
+
     private List<String> getSpawnablePokemon() {
         List<String> pool = new ArrayList<>();
 
         // Determine which map we're on
-        if (mapPath.equals("Mapa/mapa11.tmx")) {
+        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
             // MAPA 1 (PRINCIPAL)
             // Común: 100 copias
             addCopies(pool, "Rowlet", 100);
@@ -1659,40 +1607,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
             // Raro: 5 copias
             addCopies(pool, "Serperior", 5);
-
-        } else if (mapPath.equals("Mapa/Mapa2.tmx")) {
-            // MAPA 2
-            // Común: 100 copias
-            addCopies(pool, "Oshawott", 100);
-
-            // Poco común: 30 copias
-            addCopies(pool, "Vaporeon", 30);
-            addCopies(pool, "Sylveon", 30);
-
-            // Muy poco común: 15 copias
-            addCopies(pool, "Jolteon", 15);
-
-            // Raro: 5 copias
-            addCopies(pool, "Blastoise", 5);
-
-        } else if (mapPath.equals("Mapa/MAPA3.tmx")) {
-            // MAPA 3
-            // Flareon, Ivysaur, Vaporeon, Jolteon
-            addCopies(pool, "Flareon", 25);
-            addCopies(pool, "Ivysaur", 25);
-            addCopies(pool, "Vaporeon", 25);
-            addCopies(pool, "Jolteon", 25);
-
-        } else if (mapPath.equals("Mapa/MAPA 4.tmx")) {
-            // MAPA 4 - Cyndaquil, Flareon, Charizard, Gyarados
-            // Cyndaquil es común (50)
-            addCopies(pool, "Cyndaquil", 50);
-            // Flareon es poco comùn (30)
-            addCopies(pool, "Flareon", 30);
-            // Charizard es raro (10)
-            addCopies(pool, "Charizard", 10);
-            // Gyarados es muy raro (5)
-            addCopies(pool, "Gyarados", 5);
 
         } else {
             // Default/fallback para otros mapas (Pokemon Center, etc.)
@@ -1709,10 +1623,56 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             pool.add(name);
     }
 
+    /**
+     * Verifica si el Pokémon actual tiene salud. Si no, cambia automáticamente al
+     * siguiente Pokémon vivo del equipo.
+     * 
+     * @return true si hay un Pokémon listo para luchar (el actual o uno nuevo),
+     *         false si todos están debilitados.
+     */
+    private boolean checkTeamHealth() {
+        if (playerPokemon != null && playerPokemon.getActualHP() > 0) {
+            return true;
+        }
+
+        // Buscar siguiente pokemon vivo
+        java.util.List<Pokemon> team = sodyl.proyecto.clases.Pokedex.getTeam();
+        for (Pokemon p : team) {
+            if (p != null && p.getActualHP() > 0) {
+                this.playerPokemon = p;
+                // Actualizar la referencia en Pokedex es automático porque es el mismo objeto,
+                // pero aseguramos que el juego sepa que este es el activo.
+                Gdx.app.log("BATTLE", "Auto-cambio a: " + p.getEspecie());
+                return true; // Cambio realizado exitosamente
+            }
+        }
+
+        return false; // Todos muertos
+    }
+
     /** Ejecuta la transición a pantalla de batalla usando el enemigo pendiente. */
     private void proceedWithPendingBattle() {
         if (this.pendingEnemyForBattle == null)
             return;
+
+        // VERIFICACIÓN DE SALUD DEL EQUIPO
+        if (!checkTeamHealth()) {
+            if (dialogueQueue == null)
+                dialogueQueue = new LinkedList<>();
+            dialogueQueue.clear();
+            dialogueQueue.add("¡Error! Todos tus Pokémon están debilitados.");
+            dialogueQueue.add("No puedes iniciar la batalla.");
+
+            // Limpiar enemigo pendiente
+            this.pendingEnemyForBattle = null;
+            // IMPORTANTE: Activar cooldown para evitar bucles de encuentros
+            this.canTriggerEncounter = false;
+            this.encounterCooldown = 0f;
+
+            currentState = GameState.DIALOGUE;
+            processNextDialogueLine();
+            return;
+        }
 
         Pokemon enemyPokemon = this.pendingEnemyForBattle;
         this.pendingEnemyForBattle = null;
@@ -1732,34 +1692,21 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // Determine background based on map
         String backgroundPath;
-        // Map 1 uses fondoBatalla.jpg, Map 2 uses fondoBatalla2.png.png, Map 3 varies
+        // Map 1 uses fondoBatalla.jpg, Map 4 varies
         if (pendingBattleBackground != null) {
             backgroundPath = pendingBattleBackground;
             // Reset for next time
             pendingBattleBackground = null;
-        } else if (mapPath.equals("Mapa/Mapa2.tmx")) {
-            backgroundPath = "Mapa/fondoBatalla2.png.png";
-        } else if (mapPath.equals("Mapa/MAPA3.tmx")) {
-            float playerTileY = characterActor.getY() / (16 * UNIT_SCALE);
-            if (playerTileY > 25) {
-                backgroundPath = "Mapa/fondoBatalla5.png";
-            } else {
-                backgroundPath = "Mapa/fondoBatalla.jpg";
-            }
-        } else if (mapPath.equals("Mapa/MAPA 4.tmx")) {
-            // Fallback/Default for Map 4 if pendingBattleBackground wasn't set (though it
-            // should be)
-            backgroundPath = "Mapa/fondoBatalla.jpg";
         } else {
             // Default for Map 1 and other maps
             backgroundPath = "Mapa/fondoBatalla.jpg";
         }
 
         Gdx.app.log("BATTLE", "Iniciando batalla: " + playerPokemon.getEspecie() + " vs " + enemyPokemon.getEspecie()
-                + " (Background: " + backgroundPath + ")");
+                + " (Fondo: " + backgroundPath + ")");
         try {
             game.setScreen(new ScreenBatalla(game, this, playerPokemon, enemyPokemon, playerInventory, false, false,
-                    this.mapPath, backgroundPath, false));
+                    this.mapPath, backgroundPath, currentBattleNPC != null));
         } catch (Exception e) {
             e.printStackTrace();
             currentState = GameState.FREE_ROAMING;
@@ -1767,117 +1714,256 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
     }
 
-    /** Inicia una batalla con un NPC del Mapa 2 */
-    private void startNPCBattle(String pokemonName, String npcName) {
+    /** Inicia una batalla con un NPC */
+    private void startNPCBattle(String npcName, String pokemonName) {
+        // VERIFICACIÓN DE SALUD DEL EQUIPO
+        if (!checkTeamHealth()) {
+            if (dialogueQueue == null)
+                dialogueQueue = new LinkedList<>();
+            dialogueQueue.clear();
+            dialogueQueue.add("¡Error! Todos tus Pokémon están debilitados.");
+            dialogueQueue.add("No puedes luchar contra " + npcName + " en este estado.");
+            currentState = GameState.DIALOGUE;
+            processNextDialogueLine();
+            return;
+        }
+
         Pokemon enemyPokemon = Pokemones.getPokemon(pokemonName);
 
-        // Set appropriate level for NPC Pokemon
-        if (pokemonName.equals("Jolteon")) {
-            enemyPokemon.setNivel(15);
-        } else if (pokemonName.equals("Blastoise")) {
-            enemyPokemon.setNivel(20);
-        } else if (pokemonName.equals("Mewtwo")) {
-            enemyPokemon.setNivel(25);
-        } else if (pokemonName.equals("Gyarados")) { // Pennywise
-            enemyPokemon.setNivel(18);
-        } else if (pokemonName.equals("Sylveon")) { // Don Valerio
-            enemyPokemon.setNivel(22);
-        } else if (pokemonName.equals("Lucario")) { // Jesucristo
-            enemyPokemon.setNivel(35); // Adjust level as needed
-        } else if (pokemonName.equals("Mewtwo")) { // Afton (override previous Mewtwo check if needed or rely on level
-                                                   // set here)
-            // Note: There was a previous check for Mewtwo at level 25.
-            // If we want Afton's to be stronger, we should check npcName or just letting
-            // the last one win?
-            // Since this is an else-if chain, we should be careful.
-            // Actually, let's refine logic:
-            if (npcName.equals("Afton")) {
-                enemyPokemon.setNivel(40);
-            } else {
-                enemyPokemon.setNivel(25); // Default/Old Mewtwo encounter
-            }
+        if (enemyPokemon == null) {
+            Gdx.app.error("NPC_BATTLE", "No se pudo crear el Pokemon " + pokemonName);
+            return;
+        }
+
+        // Dialogue Queue
+        if (dialogueQueue == null)
+            dialogueQueue = new LinkedList<>();
+        dialogueQueue.clear();
+
+        // Color Mapping
+        if (npcName.equals("Jotaro") || npcName.equals("Don Valerio")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.BLUE);
+        } else if (npcName.equals("Giorno") || npcName.equals("Jesucristo")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.YELLOW);
+        } else if (npcName.equals("Kaneki") || npcName.equals("Pennywise")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.RED);
+        } else if (npcName.equals("William Afton")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.PURPLE);
+        }
+
+        if (npcName.equals("Kaneki")) {
+            enemyPokemon.setNivel(5);
+            dialogueQueue.add("Kaneki: ... ¿Alguna vez has sentido la verdadera tragedia en tus huesos?");
+            dialogueQueue.add("Kaneki: Este mundo está equivocado... podrido hasta la médula.");
+            dialogueQueue.add("Kaneki: No vine aquí para pelear por odio, sino por la amarga necesidad de sobrevivir.");
+            dialogueQueue
+                    .add("Kaneki: Mi Charizard ha visto el abismo conmigo. ¿Estás listo para enfrentar la oscuridad?");
+            dialogueQueue.add("Kaneki: ¡No tendré piedad con tu debilidad! ¡Aprende lo que es el dolor!");
+        } else if (npcName.equals("Jesucristo")) {
+            enemyPokemon.setNivel(5);
+            dialogueQueue.add("Jesucristo: Bienaventurados los que buscan la paz en medio de la tormenta...");
+            dialogueQueue.add(
+                    "Jesucristo: Pero hoy, hijo mío, el destino requiere que ponga a prueba la fuerza de tu espíritu.");
+            dialogueQueue.add("Jesucristo: No temas a la derrota, pues cada caída es una lección divina para el alma.");
+            dialogueQueue.add(
+                    "Jesucristo: Mi Lucario pelea con fe y rectitud. ¿Está tu corazón preparado para este juicio?");
+            dialogueQueue.add("Jesucristo: ¡Que la luz eterna ilumine nuestro campo de batalla! ¡AMÉN!");
+        } else if (npcName.equals("William Afton")) {
+            enemyPokemon.setNivel(5);
+            dialogueQueue.add("William Afton: ¿De verdad crees que unas simples criaturas pueden detenerme? ¡ILUSO!");
+            dialogueQueue.add(
+                    "William Afton: He escapado de la muerte tantas veces que ya he perdido la cuenta. ¡SIEMPRE VUELVO!");
+            dialogueQueue.add(
+                    "William Afton: He visto horrores que harían que tu frágil cordura se desvaneciera en un instante.");
+            dialogueQueue.add(
+                    "William Afton: Tus Pokémon no son más que herramientas... piezas de mi gran legado mecánico.");
+            dialogueQueue.add("William Afton: ¡Es hora de que formes parte de mi experimento final! ¡JAJAJAJA!");
+        } else if (npcName.equals("Pennywise")) {
+            enemyPokemon.setNivel(5);
+            dialogueQueue.add("Pennywise: ¡Hola, pequeño! ¡Qué Pokémon tan bonito tienes! ¿Quieres un globo?");
+            dialogueQueue.add("Pennywise: ¡Todos flotamos aquí abajo! Y pronto... ¡tú también lo harás!");
+            dialogueQueue.add("Pennywise: Tu miedo... ¡Oh, es tan dulce! Puedo saborearlo vibrando en el aire...");
+            dialogueQueue.add("Pennywise: ¿Sabes lo que pasa cuando dejas de correr? El verdadero juego comienza.");
+            dialogueQueue.add("Pennywise: ¡Ven a jugar con Pennywise! ¡No te dolerá... mucho!");
+        } else if (npcName.equals("Jotaro")) {
+            enemyPokemon.setNivel(5);
+            dialogueQueue.add("Jotaro: Yare yare daze... otro entrenador novato con ganas de fastidiar.");
+            dialogueQueue.add("Jotaro: No necesito moverme de mi sitio para aplastar tus ambiciones de un solo golpe.");
+            dialogueQueue
+                    .add("Jotaro: Mi Blastoise no conoce la palabra derrota, tiene la misma resolución que mi alma.");
+            dialogueQueue.add("Jotaro: Has cometido un grave error al cruzarte en mi camino... un error imperdonable.");
+            dialogueQueue.add("Jotaro: ¡Prepárate para recibir un castigo estrepitoso! ¡ORA ORA ORA ORA ORA!");
+        } else if (npcName.equals("Don Valerio")) {
+            enemyPokemon.setNivel(5);
+            dialogueQueue.add("Don Valerio: ... El viento susurra tu llegada. ¿Qué buscas en este santuario olvidado?");
+            dialogueQueue.add(
+                    "Don Valerio: Mis guardianas feéricas te enseñarán el respeto que le debes a la madre tierra.");
+            dialogueQueue.add(
+                    "Don Valerio: La naturaleza es sabia y generosa, pero también implacable con los corazones impuros.");
+            dialogueQueue
+                    .add("Don Valerio: El brillo de mi Sylveon guiará tu alma hacia la redención o hacia el olvido.");
+            dialogueQueue.add("Don Valerio: ¡Que la danza de los espíritus del bosque comience ahora mismo!");
+        } else if (npcName.equals("Giorno")) {
+            enemyPokemon.setNivel(5);
+            dialogueQueue.add("Giorno: Yo, Giorno Giovanna, tengo un sueño... y no permitiré que nadie lo ensucie.");
+            dialogueQueue.add("Giorno: Mi sueño es traer justicia y orden a este mundo que se ha perdido en el caos.");
+            dialogueQueue.add("Giorno: Mi Serperior posee la elegancia y la resolución de un verdadero monarca.");
+            dialogueQueue
+                    .add("Giorno: No busco la pelea, pero si eres un obstáculo para mi destino, deberé eliminarte.");
+            dialogueQueue
+                    .add("Giorno: ¡Siente la vitalidad de la justicia fluyendo en cada ataque! ¡MUDA MUDA MUDA MUDA!");
+        } else {
+            enemyPokemon.setNivel(5);
+            dialogueQueue.add(npcName + " quiere luchar!");
         }
 
         enemyPokemon.actualizarAtributos();
         enemyPokemon.setActualHP(enemyPokemon.getMaxHp());
 
-        // Store NPC name for reward handling
+        // Store NPC name for reward handling or post-battle
         currentBattleNPC = npcName;
 
         // Limpiar teclas de movimiento antes de la batalla
         clearMovementKeys();
 
-        // Determine background based on map
-        String backgroundPath;
-        // Map 1 uses fondoBatalla.jpg, Map 2 uses fondoBatalla2.png.png, Map 3 varies
-        if (mapPath.equals("Mapa/Mapa2.tmx")) {
-            backgroundPath = "Mapa/fondoBatalla2.png.png";
-        } else if (mapPath.equals("Mapa/MAPA3.tmx") || mapPath.equals("Mapa/MAPA 4.tmx")) {
-            float playerTileY = characterActor.getY() / (16 * UNIT_SCALE);
-            if (playerTileY > 25) {
-                backgroundPath = "Mapa/fondoBatalla5.png";
-            } else {
-                backgroundPath = "Mapa/fondoBatalla.jpg";
-            }
-        } else {
-            // Default for Map 1 and other maps
-            backgroundPath = "Mapa/fondoBatalla.jpg";
+        // Start first dialogue
+        if (!dialogueQueue.isEmpty()) {
+            dialogBox.setText(dialogueQueue.poll());
         }
 
-        // Transición a la pantalla de batalla
-        currentState = GameState.BATTLE;
-        game.setScreen(new ScreenBatalla(game, this, playerPokemon, enemyPokemon, playerInventory, false, false,
-                mapPath, backgroundPath, true));
+        // This will trigger the actual battle transition after the dialogue is closed
+        // We need to set a flag or state to know we are entering an NPC battle after
+        // dialogue
+        this.pendingEnemyForBattle = enemyPokemon;
+        this.pendingBattleBackground = "Mapa/fondoBatalla.jpg";
+        currentState = GameState.DIALOGUE;
+    }
+
+    private void showArceusChallenge(String npcName, String message) {
+        if (dialogueQueue == null)
+            dialogueQueue = new LinkedList<>();
+        dialogueQueue.clear();
+
+        // Color Mapping
+        if (npcName.equals("Jotaro") || npcName.equals("Don Valerio")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.BLUE);
+        } else if (npcName.equals("Giorno") || npcName.equals("Jesucristo")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.YELLOW);
+        } else if (npcName.equals("Kaneki") || npcName.equals("Pennywise")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.RED);
+        } else if (npcName.equals("William Afton")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.PURPLE);
+        }
+
+        dialogueQueue.add(npcName + ": " + message);
+
+        currentState = GameState.DIALOGUE;
+        if (!dialogueQueue.isEmpty()) {
+            dialogBox.setText(dialogueQueue.poll());
+        }
+    }
+
+    private void startDialogueNPCInteraction(String npcName) {
+        if (dialogueQueue == null)
+            dialogueQueue = new LinkedList<>();
+        dialogueQueue.clear();
+
+        // Color Mapping
+        if (npcName.equals("Bonnie")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.BLUE);
+        } else if (npcName.equals("Freddy")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.YELLOW);
+        } else if (npcName.equals("Foxy")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.RED);
+        } else if (npcName.equals("Circus Baby") || npcName.equals("Funtime Foxy")) {
+            dialogBox.setBorderColor(com.badlogic.gdx.graphics.Color.PURPLE);
+        }
+
+        if (npcName.equals("Bonnie")) {
+            dialogueQueue.add("Bonnie: ¡Brrr! ¡Vaya frío hace por aquí! ¿No te parece fascinante este páramo helado?");
+            dialogueQueue.add(
+                    "Bonnie: Este es el mapa de nieve... un lugar tan hermoso como traicionero si no estás bien abrigado.");
+            dialogueQueue.add(
+                    "Bonnie: He visto a Oshawott chapoteando en el hielo y a Sylveon buscando bayas entre la nieve.");
+            dialogueQueue
+                    .add("Bonnie: También dicen que Blastoise y Vaporeon se esconden en las cuevas más profundas...");
+            dialogueQueue.add(
+                    "Bonnie: Mantente alerta, joven entrenador. Los NPC de combate aquí no son tan amables como yo.");
+            dialogueQueue
+                    .add("Bonnie: ¡Muchos son fanáticos obsesivos de personajes que solo existen en leyendas o anime!");
+        } else if (npcName.equals("Funtime Foxy")) {
+            dialogueQueue
+                    .add("Funtime Foxy: ¡Bienvenidos damas y caballeros, niños y niñas, al ESPECTÁCULO del COMBATE!");
+            dialogueQueue.add(
+                    "Funtime Foxy: ¡No hay nada como la adrenalina de una batalla bajo los reflectores de la victoria!");
+            dialogueQueue.add(
+                    "Funtime Foxy: En la batalla, puedes seleccionar LUCHAR para atacar al pokemón enemigo, eligiendo un ataque; MOCHILA para capturar, potenciar o curar al pokemón; POKEMON para cambiar de combatiente dentro de tu equipo pokemón; HUIR para escapar del combate. ");
+            dialogueQueue.add(
+                    "Funtime Foxy: ¿Ves a alguien que encaje en tu equipo? ¡Lánzale una PokeBall desde tu inventario!");
+            dialogueQueue.add(
+                    "Funtime Foxy: ¡Recuerda, el público exige emoción! ¡Haz que cada movimiento cuente en el escenario!");
+            dialogueQueue.add("Funtime Foxy: ¡Que comience la función! ¡IT'S SHOWTIME!");
+        } else if (npcName.equals("Circus Baby")) {
+            dialogueQueue.add(
+                    "Circus Baby: Acércate... el mundo ha cambiado drásticamente en los últimos tiempos, ¿no crees?");
+            dialogueQueue.add(
+                    "Circus Baby: Desde desiertos abrasadores hasta cumbres que tocan el cielo, hay mucho que explorar.");
+            dialogueQueue.add(
+                    "Circus Baby: Se rumorea que Rowlet e Ivysaur prefieren la maleza, mientras Pikachu corre por los campos.");
+            dialogueQueue.add(
+                    "Circus Baby: Pero ten cuidado... el cansancio es un enemigo silencioso que puede llevarte a la derrota.");
+            dialogueQueue.add(
+                    "Circus Baby: No olvides que los Centros Pokémon son refugios de paz en este mundo tan caótico.");
+            dialogueQueue.add("Circus Baby: Cuida de tus amigos, y ellos cuidarán de ti cuando las luces se apaguen.");
+        } else if (npcName.equals("Foxy")) {
+            dialogueQueue.add("Foxy: ¡Arrr, grumete! ¡Saca el pecho y prepárate para el calor que se avecina!");
+            dialogueQueue.add(
+                    "Foxy: Si sigues a la derecha, llegarás a las tierras del fuego, donde la lava fluye como el ron.");
+            dialogueQueue.add(
+                    "Foxy: Allí verás a Cyndaquil y Flareon bailando entre las llamas, ¡es un espectáculo digno de ver!");
+            dialogueQueue.add(
+                    "Foxy: ¡Incluso dicen que el gran Charizard y el temible Gyarados rondan esas peligrosas aguas térmicas!");
+            dialogueQueue.add(
+                    "Foxy: Pero no te confíes, pequeño marinero... los enemigos allí son más duros que el casco de un bergantín.");
+            dialogueQueue.add(
+                    "Foxy: ¡Solo un verdadero capitán con un equipo fuerte puede conquistar el volcán y salir con vida!");
+        } else if (npcName.equals("Freddy")) {
+            dialogueQueue.add(
+                    "Freddy: Saludos, joven investigador. Es un placer ver caras nuevas explorando estos territorios.");
+            dialogueQueue.add(
+                    "Freddy: Como experto local, he documentado avistamientos de Flareon, Vaporeon y Jolteon muy cerca de aquí.");
+            dialogueQueue.add(
+                    "Freddy: Parece que la diversidad de especies ha aumentado gracias a las nuevas corrientes de energía.");
+            dialogueQueue.add(
+                    "Freddy: Mi consejo es simple: habla con todos los que encuentres, cada NPC tiene un fragmento de sabiduría.");
+            dialogueQueue.add(
+                    "Freddy: Algunos te darán consejos tácticos, otros simplemente te contarán historias de este vasto mundo.");
+            dialogueQueue
+                    .add("Freddy: ¡Disfruta de tu aventura, sé curioso y que la buena suerte te acompañe siempre!");
+        }
+
+        currentState = GameState.DIALOGUE;
+        if (!dialogueQueue.isEmpty()) {
+            dialogBox.setText(dialogueQueue.poll());
+        }
     }
 
     // Track current battle NPC for reward handling
     private String currentBattleNPC = null;
 
+    public String getCurrentBattleNPC() {
+        return currentBattleNPC;
+    }
+
+    public void clearCurrentBattleNPC() {
+        this.currentBattleNPC = null;
+    }
+
     /** Called by ScreenBatalla when player wins an NPC battle */
     public void onNPCBattleVictory(String npcName) {
         // Mark NPC as defeated
-        if (npcName.equals("Giorno")) {
-            giornoDefeated = true;
-            // Reward: 3 Pokeballs
-            playerInventory.addObjeto(101, 3);
-            dialogueQueue = new LinkedList<>();
-            dialogueQueue.add("¡Has derrotado a Giorno!");
-            dialogueQueue.add("Has recibido 3 Pokéballs como recompensa.");
-        } else if (npcName.equals("Jotaro")) {
-            jotaroDefeated = true;
-            // Reward: 5 Pokeballs
-            playerInventory.addObjeto(101, 5);
-            dialogueQueue = new LinkedList<>();
-            dialogueQueue.add("¡Has derrotado a Jotaro!");
-            dialogueQueue.add("Has recibido 5 Pokéballs como recompensa.");
-        } else if (npcName.equals("Kaneki")) {
-            kanekiDefeated = true;
-            // Reward: 10 Pokeballs
-            playerInventory.addObjeto(101, 10);
-            dialogueQueue = new LinkedList<>();
-            dialogueQueue.add("¡Has derrotado a Kaneki!");
-            dialogueQueue.add("Has recibido 10 Pokéballs como recompensa.");
-        } else if (npcName.equals("Pennywise")) {
-            pennywiseDefeated = true;
-            dialogueQueue = new LinkedList<>();
-            dialogueQueue.add("¡Has derrotado a Pennywise!");
-            dialogueQueue.add("La pesadilla ha terminado... por ahora.");
-        } else if (npcName.equals("Don Valerio")) {
-            donValerioDefeated = true;
-            dialogueQueue = new LinkedList<>();
-            dialogueQueue.add("¡Has derrotado a Don Valerio!");
-            dialogueQueue.add("Has demostrado tu valía, joven.");
-        } else if (npcName.equals("Jesucristo")) {
-            jesucristoDefeated = true;
-            dialogueQueue = new LinkedList<>();
-            dialogueQueue.add("Tu fe es fuerte.");
-            dialogueQueue.add("Has derrotado a Jesucristo.");
-        } else if (npcName.equals("Afton")) {
-            aftonDefeated = true;
-            dialogueQueue = new LinkedList<>();
-            dialogueQueue.add("¡NO! ¡Esto es imposible!");
-            dialogueQueue.add("Has derrotado a Afton.");
-        }
+        game.getDefeatedNPCs().add(npcName);
+        Gdx.app.log("BATTLE", "NPC " + npcName + " ha sido derrotado y registrado.");
 
         currentState = GameState.DIALOGUE;
         processNextDialogueLine();
@@ -1885,6 +1971,19 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     private void startArceusBattle() {
+        // VERIFICACIÓN DE SALUD DEL EQUIPO
+        if (!checkTeamHealth()) {
+            if (dialogueQueue == null)
+                dialogueQueue = new LinkedList<>();
+            dialogueQueue.clear();
+            dialogueQueue.add("¡Todos tus Pokémon están debilitados!");
+            dialogueQueue.add("No puedes desafiar a Arceus en este estado.");
+            currentState = GameState.DIALOGUE;
+            isArceusDialogue = false; // Reset flag just in case
+            processNextDialogueLine();
+            return;
+        }
+
         canTriggerEncounter = false;
         encounterCooldown = 0f;
         currentState = GameState.BATTLE;
@@ -1892,10 +1991,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Gdx.input.setInputProcessor(null);
 
         Pokemon arceus = sodyl.proyecto.clases.Pokemones.getPokemon("Arceus");
-        // Asegurar nivel 100 o dificultad máxima si se desea, por ahora stats base
-        // definidos en Pokemones.java
-        // arceus.setNivel(100);
-        // arceus.actualizarAtributos();
+        // Batalla Final: Arceus nivel 10
+        arceus.setNivel(10);
+        arceus.actualizarAtributos();
 
         if (playerPokemon == null) {
             dialogueQueue.add("¡No tienes Pokémon para luchar!");
@@ -1920,7 +2018,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
      * Genera objetos coleccionables aleatoriamente SÓLO sobre tiles con el ID 2
      * (Hierba).
      */
-    private void spawnCollectiblesOnGrassTiles(int totalItemsToSpawn) {
+    protected void spawnCollectiblesOnGrassTiles(int totalItemsToSpawn) {
         // Tiles Nivel 1: 417, 505, 5193, 5192, 5194, 1617, 1616, 1618, 5281, 5282, 418
         // Tiles TIERRA: 1
 
@@ -1932,48 +2030,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         List<Float[]> validSpawnPositions = new ArrayList<>();
 
-        // --- LOGICA MAPA 2 ---
-        if (mapPath.equals("Mapa/Mapa2.tmx")) {
-            for (MapLayer mapLayer : map.getLayers()) {
-                if (mapLayer instanceof TiledMapTileLayer) {
-                    TiledMapTileLayer layer = (TiledMapTileLayer) mapLayer;
-                    for (int y = 0; y < layer.getHeight(); y++) {
-                        for (int x = 0; x < layer.getWidth(); x++) {
-                            Cell cell = layer.getCell(x, y);
-                            if (cell != null && cell.getTile() != null) {
-                                if (VALID_COLLECTIBLE_TILES_MAP2.contains(cell.getTile().getId())) {
-                                    float worldX = x * TILE_WIDTH * UNIT_SCALE;
-                                    float worldY = y * TILE_HEIGHT * UNIT_SCALE;
-                                    validSpawnPositions.add(new Float[] { worldX, worldY });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } else if (mapPath.equals("Mapa/MAPA3.tmx")) {
-            // --- LOGICA MAPA 3 (Coordinate-based spawning) ---
-            for (String coord : VALID_COLLECTIBLE_COORDS_MAP3) {
-                String[] parts = coord.split(",");
-                int tileX = Integer.parseInt(parts[0]);
-                int tileY = Integer.parseInt(parts[1]);
-
-                float worldX = tileX * TILE_WIDTH * UNIT_SCALE;
-                float worldY = tileY * TILE_HEIGHT * UNIT_SCALE;
-                validSpawnPositions.add(new Float[] { worldX, worldY });
-            }
-        } else if (mapPath.equals("Mapa/MAPA 4.tmx")) {
-            // --- LOGICA MAPA 4 (Coordinate-based spawning) ---
-            for (String coord : VALID_COLLECTIBLE_COORDS_MAP4) {
-                String[] parts = coord.split(",");
-                int tileX = Integer.parseInt(parts[0]);
-                int tileY = Integer.parseInt(parts[1]);
-
-                float worldX = tileX * TILE_WIDTH * UNIT_SCALE;
-                float worldY = tileY * TILE_HEIGHT * UNIT_SCALE;
-                validSpawnPositions.add(new Float[] { worldX, worldY });
-            }
-        } else {
+        {
             // --- LOGICA EXISTENTE (MAPA 1) ---
             // Check Layer "NIvel 1"
             TiledMapTileLayer layerNivel1 = (TiledMapTileLayer) map.getLayers().get("NIvel 1");
@@ -2066,8 +2123,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 // Convert world position back to tile coordinates for logging
                 int tileX = (int) (worldX / (TILE_WIDTH * UNIT_SCALE));
                 int tileY = (int) (worldY / (TILE_HEIGHT * UNIT_SCALE));
-                Gdx.app.log("COLECTABLES",
-                        "  → Tile (" + tileX + ", " + tileY + "): " + materialName + " x" + quantity);
 
                 Collectible collectible = new Collectible(
                         adjustedX,
@@ -2120,8 +2175,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             // Convert world position back to tile coordinates for logging
             int tileX = (int) (worldX / (TILE_WIDTH * UNIT_SCALE));
             int tileY = (int) (worldY / (TILE_HEIGHT * UNIT_SCALE));
-            Gdx.app.log("COLECTABLES",
-                    "  → Tile (" + tileX + ", " + tileY + "): " + selectedItemName + " x" + quantity);
 
             Collectible collectible = new Collectible(
                     adjustedX,
@@ -2130,11 +2183,56 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     quantity,
                     item.getTexturePath());
             collectibles.add(collectible);
-            stage.addActor(collectible.getActor());
         }
 
         Gdx.app.log("COLECTABLES",
                 "Se generaron " + collectibles.size + " objetos aleatorios en total.");
+    }
+
+    protected void spawnPrimaryMaterialsInZones(int itemsPerType) {
+        if (!mapPath.equals("Mapa/MAPACOMPLETO.tmx"))
+            return;
+
+        final int TILE_WIDTH = map.getProperties().get("tilewidth", Integer.class);
+        final int TILE_HEIGHT = map.getProperties().get("tileheight", Integer.class);
+        float collectibleSize = 1f;
+
+        String[] primaryMaterials = { "Bonguri", "Hierba éter", "Guijarro Rojo", "Baya Aranja", "Hierba Regia" };
+        List<String> tiles = new ArrayList<>(PRIMARY_MATERIAL_TILES_MAP1);
+
+        for (String materialName : primaryMaterials) {
+            for (int i = 0; i < itemsPerType; i++) {
+                if (tiles.isEmpty())
+                    break;
+
+                Objeto item = Objeto.getObjetoByName(materialName);
+                if (item == null)
+                    continue;
+
+                int randomIndex = random.nextInt(tiles.size());
+                String coord = tiles.remove(randomIndex);
+                String[] parts = coord.split(",");
+                int tileX = Integer.parseInt(parts[0]);
+                int tileY = Integer.parseInt(parts[1]);
+
+                float worldX = tileX * TILE_WIDTH * UNIT_SCALE;
+                float worldY = tileY * TILE_HEIGHT * UNIT_SCALE;
+                float adjustedX = worldX + (TILE_WIDTH * UNIT_SCALE - collectibleSize) / 2f;
+                float adjustedY = worldY + (TILE_HEIGHT * UNIT_SCALE - collectibleSize) / 2f;
+
+                int quantity = random.nextInt(3) + 1;
+
+                Collectible collectible = new Collectible(
+                        adjustedX,
+                        adjustedY,
+                        item.getId(),
+                        quantity,
+                        item.getTexturePath());
+                collectibles.add(collectible);
+                stage.addActor(collectible.getActor());
+            }
+        }
+        Gdx.app.log("SPAWN", "Se generaron materiales primarios en zonas específicas del Mapa 1.");
     }
 
     private void startProfessorYoelAnimation() {
@@ -2285,6 +2383,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         TextButton inventoryButton = new TextButton("Inventario", buttonStyle);
 
         TextButton pokedexButton = new TextButton("Pokédex", buttonStyle);
+        TextButton pokemonesDataButton = new TextButton("Pokemones", buttonStyle);
         TextButton saveButton = new TextButton("Guardar Partida", buttonStyle);
         TextButton mainMenuButton = new TextButton("Menú Principal", buttonStyle);
         TextButton backButton = new TextButton("Volver (ESC)", buttonStyle);
@@ -2298,6 +2397,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         // pauseMenuTable.add(craftingButton).width(250).height(60).pad(10).row(); //
         // REMOVIDO
         pauseMenuTable.add(pokedexButton).width(250).height(60).pad(10).row();
+        pauseMenuTable.add(pokemonesDataButton).width(250).height(60).pad(10).row();
         pauseMenuTable.add(saveButton).width(250).height(60).pad(10).row();
         pauseMenuTable.add(mainMenuButton).width(250).height(60).pad(10).row();
         pauseMenuTable.add(backButton).width(250).height(60).pad(10).row();
@@ -2334,9 +2434,17 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // Crafting button removed from direct access, now via Inventory Submenu
 
-        // Remove craftingButton from array if we want clean index logic,
-        // or just ignore it in execution. Let's start fresh with array.
-        pauseMenuButtons = new TextButton[] { inventoryButton, pokedexButton, saveButton, mainMenuButton, backButton };
+        pokemonesDataButton.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                if (currentState == GameState.PAUSED) {
+                    showPokemonesMenu();
+                }
+            }
+        });
+
+        pauseMenuButtons = new TextButton[] { inventoryButton, pokedexButton, pokemonesDataButton, saveButton,
+                mainMenuButton, backButton };
 
         updatePauseMenuSelection(0);
     }
@@ -2361,7 +2469,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         itemContainer.top().left();
         itemContainer.pad(10);
 
-        inventoryMenuTable.add(itemContainer).colspan(4).expand().fill().row();
+        ScrollPane scrollPane = new ScrollPane(itemContainer);
+        scrollPane.setFadeScrollBars(false);
+        scrollPane.setScrollingDisabled(true, false); // Solo vertical
+        scrollPane.setName("inventoryScrollPane");
+
+        inventoryMenuTable.add(scrollPane).colspan(4).expand().fill().row();
 
         TextButton backButton = new TextButton("Volver (ESC)",
                 new TextButton.TextButtonStyle(new TextureRegionDrawable(darkBackground), null, null, font));
@@ -2373,6 +2486,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     currentState = GameState.PAUSED;
                     inventoryMenuTable.setVisible(false);
                     pauseMenuTable.setVisible(true);
+                    updatePauseMenuSelection(selectedIndex);
                 }
             }
         });
@@ -2397,7 +2511,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Label.LabelStyle descStyle = new Label.LabelStyle(font, Color.LIGHT_GRAY);
         Label.LabelStyle qtyStyle = new Label.LabelStyle(font, Color.YELLOW);
 
-        itemContainer.add(new Label("ICONO", nameStyle)).width(70).padRight(10);
+        itemContainer.add(new Label("ICONO", nameStyle)).width(60).padRight(10);
         itemContainer.add(new Label("NOMBRE / DESCRIPCIÓN", nameStyle)).expandX().fillX();
         itemContainer.add(new Label("CANTIDAD", nameStyle)).width(150).row();
         itemContainer.add().colspan(3).height(5).row();
@@ -2415,6 +2529,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             Texture itemTexture = itemTextures.get(itemId);
             if (itemTexture != null) {
                 Image icon = new Image(itemTexture);
+                // Reducido de 100 a 60
                 itemContainer.add(icon).width(60).height(60).padRight(10).center();
             } else {
                 itemContainer.add(new Label("?", nameStyle)).width(60).height(60).padRight(10).center();
@@ -2494,6 +2609,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     currentState = GameState.PAUSED;
                     craftingMenuTable.setVisible(false);
                     pauseMenuTable.setVisible(true);
+                    updatePauseMenuSelection(selectedIndex);
                 }
             }
         });
@@ -2608,7 +2724,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             if (currentState == GameState.FREE_ROAMING || dialogueQueue.isEmpty()) {
                 currentState = GameState.PAUSED;
                 pauseMenuTable.setVisible(true);
-                selectedIndex = 0;
                 updatePauseMenuSelection(0);
             } else {
                 Gdx.app.log("PAUSA", "Diálogo pendiente. No se puede pausar.");
@@ -2628,11 +2743,22 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     private void updatePauseMenuSelection(int newIndex) {
-        if (pauseMenuButtons.length == 0)
+        if (pauseMenuButtons == null || pauseMenuButtons.length == 0)
             return;
-        pauseMenuButtons[selectedIndex].getLabel().setColor(Color.WHITE);
+
+        // Reset all buttons to WHITE to avoid multiple highlights
+        for (TextButton btn : pauseMenuButtons) {
+            if (btn != null && btn.getLabel() != null) {
+                btn.getLabel().setColor(Color.WHITE);
+            }
+        }
+
         selectedIndex = (newIndex + pauseMenuButtons.length) % pauseMenuButtons.length;
-        pauseMenuButtons[selectedIndex].getLabel().setColor(Color.YELLOW);
+
+        // Highlight the strictly selected one
+        if (pauseMenuButtons[selectedIndex] != null && pauseMenuButtons[selectedIndex].getLabel() != null) {
+            pauseMenuButtons[selectedIndex].getLabel().setColor(Color.YELLOW);
+        }
     }
 
     private void executePauseMenuAction(int index) {
@@ -2650,13 +2776,11 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             showInventorySubmenu(); // Show unified menu
         else if (index == 1)
             showPokedexMenu();
-        else if (index == 2) {
+        else if (index == 2)
+            showPokemonesMenu();
+        else if (index == 3) {
             // Guardar Partida
-            sodyl.proyecto.clases.Pokedex.save();
-            if (playerInventory != null) {
-                playerInventory.save(sodyl.proyecto.clases.UserManager.getCurrentUser());
-            }
-
+            game.saveProgress(playerInventory);
             togglePauseMenu(); // Cerrar pausa
 
             // Mostrar mensaje
@@ -2666,9 +2790,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             dialogueQueue.add("¡Partida guardada correctamente!");
             currentState = GameState.DIALOGUE;
             processNextDialogueLine();
-        } else if (index == 3)
+        } else if (index == 4)
             startTransitionToMainMenu();
-        else if (index == 4)
+        else if (index == 5)
             togglePauseMenu();
     }
 
@@ -2738,6 +2862,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             currentState = GameState.PAUSED;
             inventorySubmenuTable.setVisible(false);
             pauseMenuTable.setVisible(true);
+            updatePauseMenuSelection(selectedIndex);
         }
     }
 
@@ -2970,12 +3095,11 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Gdx.input.setInputProcessor(null);
     }
 
-    private void startTransitionToPokemonCenter() {
+    private void startTransitionToPokemonCenter(float returnTileX, float returnTileY) {
         currentState = GameState.TRANSITIONING;
         transitionTimer = 0f;
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, null, null, "Mapa/mapa11.tmx"));
+        nextScreen = new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
+                null, GameState.FREE_ROAMING, null, null, "Mapa/MAPACOMPLETO.tmx", returnTileX, returnTileY);
         Gdx.input.setInputProcessor(null);
     }
 
@@ -2984,132 +3108,23 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         transitionTimer = 0f;
 
         // Check which map to return to
-        if (sourceMapBeforePokemonCenter != null && sourceMapBeforePokemonCenter.equals("Mapa/Mapa2.tmx")) {
-            // Return to Map 2 at the Pokemon Center entrance (tile 45, 27 - one tile below
-            // the entrance)
-            float returnX = 45f * 16f * UNIT_SCALE;
-            float returnY = 27f * 16f * UNIT_SCALE;
-            nextScreen = new ScreenCarga(game,
-                    () -> new ScreenMapaTiled(game, "Mapa/Mapa2.tmx", playerInventory, playerPokemon,
-                            null, GameState.FREE_ROAMING, returnX, returnY));
-        } else if (sourceMapBeforePokemonCenter != null && sourceMapBeforePokemonCenter.equals("Mapa/MAPA3.tmx")) {
-            // Return to Map 3 (Tile 25, 33 - one tile below entrance)
-            float returnX = 25f * 16f * UNIT_SCALE;
-            float returnY = 33f * 16f * UNIT_SCALE;
-            nextScreen = new ScreenCarga(game,
-                    () -> new ScreenMapaTiled(game, "Mapa/MAPA3.tmx", playerInventory, playerPokemon,
-                            null, GameState.FREE_ROAMING, returnX, returnY));
-        } else {
-            // Return to Map 1 at the Pokemon Center entrance (tile 38, 36)
-            float returnX = 38f * 16f * UNIT_SCALE;
-            float returnY = 36f * 16f * UNIT_SCALE;
-            nextScreen = new ScreenCarga(game,
-                    () -> new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
-                            null, GameState.FREE_ROAMING, returnX, returnY));
+        {
+            // Default return position (original entrance)
+            float tileX = 38f;
+            float tileY = 36f;
+
+            // Use stored return coordinates if available
+            if (returnTileXBeforePokemonCenter != null && returnTileYBeforePokemonCenter != null) {
+                tileX = returnTileXBeforePokemonCenter;
+                tileY = returnTileYBeforePokemonCenter;
+            }
+
+            float returnX = tileX * 16f * UNIT_SCALE;
+            float returnY = tileY * 16f * UNIT_SCALE;
+            nextScreen = new ScreenMapaTiled(game, "Mapa/MAPACOMPLETO.tmx", playerInventory, playerPokemon,
+                    null, GameState.FREE_ROAMING, returnX, returnY);
         }
 
-        Gdx.input.setInputProcessor(null);
-    }
-
-    private void startTransitionToMap2() {
-        currentState = GameState.TRANSITIONING;
-        transitionTimer = 0f;
-
-        // Spawn solicitado: Tile 48, 44 (Tiled) -> Y=26 (LibGDX approx)
-        float spawnX = 48f * 16f * UNIT_SCALE;
-        float spawnY = 26f * 16f * UNIT_SCALE;
-
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/Mapa2.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, spawnX, spawnY));
-        Gdx.input.setInputProcessor(null);
-    }
-
-    private void startTransitionBackToMap1FromMap2() {
-        currentState = GameState.TRANSITIONING;
-        transitionTimer = 0f;
-        // Volver a Mapa 1, un tile a la derecha de donde entró (Entrada X=0 -> Salida
-        // X=1)
-        // Centrado en el path Y=19 (entre 17 y 21)
-        float returnX = 1f * 16f * UNIT_SCALE;
-        float returnY = 19f * 16f * UNIT_SCALE;
-
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, returnX, returnY));
-        Gdx.input.setInputProcessor(null);
-    }
-
-    private void startTransitionToPokemonCenterFromMap2() {
-        currentState = GameState.TRANSITIONING;
-        transitionTimer = 0f;
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, null, null, "Mapa/Mapa2.tmx"));
-        Gdx.input.setInputProcessor(null);
-    }
-
-    private void startTransitionToMap3() {
-        currentState = GameState.TRANSITIONING;
-        transitionTimer = 0f;
-
-        // Spawn en Mapa 3: Borde Izquierdo (X=1), Y=23 (Centrado relativo a la salida)
-        float spawnX = 1f * 16f * UNIT_SCALE;
-        float spawnY = 23f * 16f * UNIT_SCALE;
-
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/MAPA3.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, spawnX, spawnY));
-        Gdx.input.setInputProcessor(null);
-    }
-
-    private void startTransitionToPokemonCenterFromMap3() {
-        currentState = GameState.TRANSITIONING;
-        transitionTimer = 0f;
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/Centro Pokemon interior.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, null, null, "Mapa/MAPA3.tmx"));
-        Gdx.input.setInputProcessor(null);
-    }
-
-    private void startTransitionBackToMap1FromMap3() {
-        currentState = GameState.TRANSITIONING;
-        transitionTimer = 0f;
-        // Return to Map 1 at right edge (X=48), Y=23 (centered relative to Map 3 exit)
-        float returnX = 48f * 16f * UNIT_SCALE;
-        float returnY = 23f * 16f * UNIT_SCALE;
-
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, returnX, returnY));
-        Gdx.input.setInputProcessor(null);
-    }
-
-    private void startTransitionToMap4() {
-        currentState = GameState.TRANSITIONING;
-        transitionTimer = 0f;
-
-        // Aparecer en Mapa 4, Borde Inferior
-        float spawnX = 24.5f * 16f * UNIT_SCALE;
-        float spawnY = 1.5f * 16f * UNIT_SCALE;
-
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/MAPA 4.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, spawnX, spawnY));
-        Gdx.input.setInputProcessor(null);
-    }
-
-    private void startTransitionBackToMap1FromMap4() {
-        currentState = GameState.TRANSITIONING;
-        transitionTimer = 0f;
-
-        // Regresamos a Mapa 1 cerca de donde entramos (Borde Superior)
-        float spawnX = 24.5f * 16f * UNIT_SCALE;
-        float spawnY = 47.5f * 16f * UNIT_SCALE;
-
-        nextScreen = new ScreenCarga(game,
-                () -> new ScreenMapaTiled(game, "Mapa/mapa11.tmx", playerInventory, playerPokemon,
-                        null, GameState.FREE_ROAMING, spawnX, spawnY));
         Gdx.input.setInputProcessor(null);
     }
 
@@ -3125,6 +3140,22 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         if (currentState == GameState.FREE_ROAMING) {
             handleMovement(delta);
+
+            // --- LÓGICA DE RESPAWN DE OBJETOS ---
+            if (collectibles != null) {
+                for (Collectible c : collectibles) {
+                    if (c.isCollected()) {
+                        long elapsed = System.currentTimeMillis() - c.getCollectionTime();
+                        if (elapsed >= 300000) { // 300,000 ms = 5 minutos
+                            c.setCollected(false);
+                            stage.addActor(c.getActor());
+                            Gdx.app.log("COLLECTIBLES",
+                                    "Objeto " + sodyl.proyecto.clases.Objeto.getObjeto(c.getItemId()).getNombre()
+                                            + " ha reaparecido.");
+                        }
+                    }
+                }
+            }
 
             // Actualizar cooldown de encuentros
             if (!canTriggerEncounter) {
@@ -3155,16 +3186,83 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         clampCamera();
         camera.update();
 
+        // Update NPC animations (Looping every 0.5s per frame)
+        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+            npcAnimationTimer += delta;
+            if (npcAnimationTimer >= NPC_FRAME_DURATION * 2) {
+                npcAnimationTimer = 0;
+            }
+
+            boolean useFrame2 = npcAnimationTimer >= NPC_FRAME_DURATION;
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d1 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? kaneki2Texture : kaneki1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d2 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(
+                            useFrame2 ? jesucristo2Texture : jesucristo1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d3 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? afton2Texture : afton1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d4 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? pennywise2Texture : pennywise1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d5 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? jotaro2Texture : jotaro1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d6 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(
+                            useFrame2 ? donValerio2Texture : donValerio1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d7 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? giorno2Texture : giorno1Texture));
+
+            // DIALOGUE NPCs
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d8 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? bonnie2Texture : bonnie1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d9 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? fntFoxy2Texture : fntFoxy1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d10 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(
+                            useFrame2 ? circusBaby2Texture : circusBaby1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d11 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? foxy2Texture : foxy1Texture));
+            com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d12 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                    new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? freddy2Texture : freddy1Texture));
+
+            if (kanekiImage != null)
+                kanekiImage.setDrawable(d1);
+            if (jesucristoImage != null)
+                jesucristoImage.setDrawable(d2);
+            if (aftonImage != null)
+                aftonImage.setDrawable(d3);
+            if (pennywiseImage != null)
+                pennywiseImage.setDrawable(d4);
+            if (jotaroImage != null)
+                jotaroImage.setDrawable(d5);
+            if (donValerioImage != null)
+                donValerioImage.setDrawable(d6);
+            if (giornoImage != null)
+                giornoImage.setDrawable(d7);
+
+            if (bonnieImage != null)
+                bonnieImage.setDrawable(d8);
+            if (fntFoxyImage != null)
+                fntFoxyImage.setDrawable(d9);
+            if (circusBabyImage != null)
+                circusBabyImage.setDrawable(d10);
+            if (foxyImage != null)
+                foxyImage.setDrawable(d11);
+            if (freddyImage != null)
+                freddyImage.setDrawable(d12);
+        }
+
         if (renderer != null && map != null) {
             try {
-                // Dynamically find tile layers to render (excluding visual collision layers)
+                // Dynamically find tile layers to render (excluding visual collision layers and
+                // BASE shadow layer)
                 com.badlogic.gdx.utils.IntArray layersToRender = new com.badlogic.gdx.utils.IntArray();
                 for (int i = 0; i < map.getLayers().getCount(); i++) {
                     MapLayer layer = map.getLayers().get(i);
-                    // Only render tile layers, but skip the visual "Colisiones" layer
+                    // Only render tile layers, but skip the visual "Colisiones" layer and "BASE"
+                    // shadow layer
                     if (layer instanceof com.badlogic.gdx.maps.tiled.TiledMapTileLayer) {
                         String layerName = layer.getName();
-                        if (layerName != null && layerName.equals("Colisiones")) {
+                        if (layerName != null && (layerName.equals("Colisiones") || layerName.equals("BASE"))) {
                             continue;
                         }
                         layersToRender.add(i);
@@ -3187,18 +3285,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 }
             }
 
-            // Bonnie Animation (Map 3)
-            if (mapPath.equals("Mapa/MAPA 3.tmx")) {
-                if (bonnieActor != null && bonnieTexture1 != null && bonnieTexture2 != null) {
-                    bonnieAnimTimer += delta;
-                    if (bonnieAnimTimer >= 0.5f) {
-                        bonnieFrame1 = !bonnieFrame1;
-                        bonnieActor
-                                .setDrawable(new TextureRegionDrawable(bonnieFrame1 ? bonnieTexture1 : bonnieTexture2));
-                        bonnieAnimTimer = 0;
-                    }
-                }
-            }
         } else
 
         {
@@ -3207,110 +3293,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
 
         stage.act(delta);
-
-        // Animate Map 2 NPCs
-        if (mapPath.equals("Mapa/Mapa2.tmx")) {
-            // Giorno animation
-            if (giornoActor != null && giornoTexture1 != null && giornoTexture2 != null) {
-                giornoAnimTimer += delta;
-                if (giornoAnimTimer >= 0.5f) {
-                    giornoFrame1 = !giornoFrame1;
-                    giornoActor.setDrawable(new TextureRegionDrawable(giornoFrame1 ? giornoTexture1 : giornoTexture2));
-                    giornoAnimTimer = 0;
-                }
-            }
-
-            // Jotaro animation
-            if (jotaroActor != null && jotaroTexture1 != null && jotaroTexture2 != null) {
-                jotaroAnimTimer += delta;
-                if (jotaroAnimTimer >= 0.5f) {
-                    jotaroFrame1 = !jotaroFrame1;
-                    jotaroActor.setDrawable(new TextureRegionDrawable(jotaroFrame1 ? jotaroTexture1 : jotaroTexture2));
-                    jotaroAnimTimer = 0;
-                }
-            }
-
-            // Kaneki animation
-            if (kanekiActor != null && kanekiTexture1 != null && kanekiTexture2 != null) {
-                kanekiAnimTimer += delta;
-                if (kanekiAnimTimer >= 0.5f) {
-                    kanekiFrame1 = !kanekiFrame1;
-                    kanekiActor.setDrawable(new TextureRegionDrawable(kanekiFrame1 ? kanekiTexture1 : kanekiTexture2));
-                    kanekiAnimTimer = 0;
-                }
-            }
-
-            // Freddy Map 2 animation
-            if (freddyMap2Actor != null && freddyMap2Texture1 != null && freddyMap2Texture2 != null) {
-                freddyMap2AnimTimer += delta;
-                if (freddyMap2AnimTimer >= 0.5f) {
-                    freddyMap2Frame1 = !freddyMap2Frame1;
-                    freddyMap2Actor.setDrawable(
-                            new TextureRegionDrawable(freddyMap2Frame1 ? freddyMap2Texture1 : freddyMap2Texture2));
-                    freddyMap2AnimTimer = 0;
-                }
-            }
-        }
-
-        // Animate Map 3 NPCs
-        if (mapPath.equals("Mapa/MAPA3.tmx")) {
-            // Pennywise animation
-            if (pennywiseActor != null && pennywiseTexture1 != null && pennywiseTexture2 != null) {
-                pennywiseAnimTimer += delta;
-                if (pennywiseAnimTimer >= 0.5f) {
-                    pennywiseFrame1 = !pennywiseFrame1;
-                    pennywiseActor.setDrawable(
-                            new TextureRegionDrawable(pennywiseFrame1 ? pennywiseTexture1 : pennywiseTexture2));
-                    pennywiseAnimTimer = 0;
-                }
-            }
-
-            // Don Valerio animation
-            if (donValerioActor != null && donValerioTexture1 != null && donValerioTexture2 != null) {
-                donValerioAnimTimer += delta;
-                if (donValerioAnimTimer >= 0.5f) {
-                    donValerioFrame1 = !donValerioFrame1;
-                    donValerioActor.setDrawable(
-                            new TextureRegionDrawable(donValerioFrame1 ? donValerioTexture1 : donValerioTexture2));
-                    donValerioAnimTimer = 0;
-                }
-            }
-        }
-
-        // Animate Map 4 NPCs
-        if (mapPath.equals("Mapa/MAPA 4.tmx")) {
-            // Jesucristo animation
-            if (jesucristoActor != null && jesucristoTexture1 != null && jesucristoTexture2 != null) {
-                jesucristoAnimTimer += delta;
-                if (jesucristoAnimTimer >= 0.5f) {
-                    jesucristoFrame1 = !jesucristoFrame1;
-                    jesucristoActor.setDrawable(
-                            new TextureRegionDrawable(jesucristoFrame1 ? jesucristoTexture1 : jesucristoTexture2));
-                    jesucristoAnimTimer = 0;
-                }
-            }
-
-            // Afton animation
-            if (aftonActor != null && aftonTexture1 != null && aftonTexture2 != null) {
-                aftonAnimTimer += delta;
-                if (aftonAnimTimer >= 0.5f) {
-                    aftonFrame1 = !aftonFrame1;
-                    aftonActor.setDrawable(new TextureRegionDrawable(aftonFrame1 ? aftonTexture1 : aftonTexture2));
-                    aftonAnimTimer = 0;
-                }
-            }
-
-            // Map 4 Info NPC animation
-            if (map4InfoNpcActor != null && map4InfoNpcTexture1 != null && map4InfoNpcTexture2 != null) {
-                map4InfoNpcAnimTimer += delta;
-                if (map4InfoNpcAnimTimer >= 0.5f) {
-                    map4InfoNpcFrame1 = !map4InfoNpcFrame1;
-                    map4InfoNpcActor.setDrawable(
-                            new TextureRegionDrawable(map4InfoNpcFrame1 ? map4InfoNpcTexture1 : map4InfoNpcTexture2));
-                    map4InfoNpcAnimTimer = 0;
-                }
-            }
-        }
 
         stage.draw();
 
@@ -3467,54 +3449,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     private void updateCharacterAnimation() {
-        // Update Funtime Foxy Animation (if present)
-        if (funtimeFoxyActor != null && funtimeFoxyTexture1 != null && funtimeFoxyTexture2 != null) {
-            funtimeFoxyAnimTimer += Gdx.graphics.getDeltaTime();
-            if (funtimeFoxyAnimTimer > 0.5f) { // Switch every 0.5 seconds
-                funtimeFoxyAnimTimer = 0;
-                funtimeFoxyFrame1 = !funtimeFoxyFrame1;
-
-                // We need to use setDrawable for Image actors
-                if (funtimeFoxyFrame1) {
-                    funtimeFoxyActor.setDrawable(new TextureRegionDrawable(new TextureRegion(funtimeFoxyTexture1)));
-                } else {
-                    funtimeFoxyActor.setDrawable(new TextureRegionDrawable(new TextureRegion(funtimeFoxyTexture2)));
-                }
-            }
-        }
-
-        // Update Circus Baby Animation (if present)
-        if (circusBabyActor != null && circusBabyTexture1 != null && circusBabyTexture2 != null) {
-            circusBabyAnimTimer += Gdx.graphics.getDeltaTime();
-            if (circusBabyAnimTimer > 0.5f) { // Switch every 0.5 seconds
-                circusBabyAnimTimer = 0;
-                circusBabyFrame1 = !circusBabyFrame1;
-
-                // We need to use setDrawable for Image actors
-                if (circusBabyFrame1) {
-                    circusBabyActor.setDrawable(new TextureRegionDrawable(new TextureRegion(circusBabyTexture1)));
-                } else {
-                    circusBabyActor.setDrawable(new TextureRegionDrawable(new TextureRegion(circusBabyTexture2)));
-                }
-            }
-        }
-
-        // Update Funtime Freddy Animation (if present)
-        if (funtimeFreddyActor != null && funtimeFreddyTexture1 != null && funtimeFreddyTexture2 != null) {
-            funtimeFreddyAnimTimer += Gdx.graphics.getDeltaTime();
-            if (funtimeFreddyAnimTimer > 0.5f) { // Switch every 0.5 seconds
-                funtimeFreddyAnimTimer = 0;
-                funtimeFreddyFrame1 = !funtimeFreddyFrame1;
-
-                // We need to use setDrawable for Image actors
-                if (funtimeFreddyFrame1) {
-                    funtimeFreddyActor.setDrawable(new TextureRegionDrawable(new TextureRegion(funtimeFreddyTexture1)));
-                } else {
-                    funtimeFreddyActor.setDrawable(new TextureRegionDrawable(new TextureRegion(funtimeFreddyTexture2)));
-                }
-            }
-        }
-
         TextureRegion currentFrame;
         boolean isMoving = (movingUp || movingDown || movingLeft || movingRight)
                 && currentState == GameState.FREE_ROAMING;
@@ -3591,7 +3525,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             lastDirection = Direction.RIGHT;
         }
 
-        if (dx == 0 && dy == 0)
+        boolean isMoving = (dx != 0 || dy != 0);
+        if (!isMoving)
             return;
 
         if (dx != 0) {
@@ -3640,12 +3575,36 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         characterActor.setPosition(nextX, nextY);
 
+        // --- SYNC POSITION ---
+        if (isMultiplayer && conexion != null && conexion.isConectado()) {
+            syncTimer += delta;
+            if (syncTimer >= SYNC_INTERVAL) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("tipo", "mover");
+                data.put("id", sodyl.proyecto.clases.UserManager.getCurrentUser());
+                data.put("x", nextX);
+                data.put("y", nextY);
+                data.put("dir", lastDirection.name());
+                data.put("moving", isMoving);
+                conexion.enviar(data);
+                syncTimer = 0;
+            }
+        }
+
         int tileX = (int) ((nextX + playerWidth / 2) / (tileWidth * UNIT_SCALE));
         int tileY = (int) ((nextY + playerHeight / 2) / (tileHeight * UNIT_SCALE));
 
         // Transition from Map 1 to Pokemon Center
-        if (mapPath.equals("Mapa/mapa11.tmx") && tileX == 38 && tileY == 37) {
-            startTransitionToPokemonCenter();
+        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+            if (tileX == 38 && tileY == 37) {
+                startTransitionToPokemonCenter(38, 36);
+            } else if (tileX == 5 && tileY == 45) {
+                startTransitionToPokemonCenter(5, 44);
+            } else if (tileX == 87 && tileY == 32) {
+                startTransitionToPokemonCenter(87, 31);
+            } else if (tileX == 125 && tileY == 30) {
+                startTransitionToPokemonCenter(125, 29);
+            }
         }
 
         // Transition from Pokemon Center back to Map 1 (exit when walking down toward
@@ -3654,65 +3613,20 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             startTransitionBackToMap1();
         }
 
-        // --- TRANSICIÓN MAPA 1 <-> MAPA 2 ---
-
-        // LOG SOLICITADO: Solo imprime el tile actual si CAMBIA
-        if (tileX != lastLogTileX || tileY != lastLogTileY) {
-            Gdx.app.log("COORD", "Tile: " + tileX + ", " + tileY);
-            lastLogTileX = tileX;
-            lastLogTileY = tileY;
-        }
+        // LOG SOLICITADO: Solo imprime el tile actual si CAMBIA -> ELIMINADO POR
+        // SOLICITUD
+        /*
+         * if (tileX != lastLogTileX || tileY != lastLogTileY) {
+         * Gdx.app.log("COORD", "Tile: " + tileX + ", " + tileY);
+         * lastLogTileX = tileX;
+         * lastLogTileY = tileY;
+         * }
+         */
 
         // Agregamos un tiempo de gracia (2 segundos) para evitar loops inmediatos al
         // hacer spawn en un tile de transición
         if (stateTime > 2.0f) {
-            // Transición de Mapa 1 a Mapa 2 (Tiles 0,17 a 0,21 EXTREMA IZQUIERDA)
-            if (mapPath.equals("Mapa/mapa11.tmx") && tileX == 0 && (tileY >= 17 && tileY <= 21)) {
-                Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 2 desde X=" + tileX + ", Y=" + tileY);
-                startTransitionToMap2();
-            }
 
-            // Transición de Mapa 2 a Mapa 1 (Borde Derecho Tile 49)
-            // Tiled Y=44 -> LibGDX Y=26. Damos un margen.
-            if (mapPath.equals("Mapa/Mapa2.tmx") && tileX == 49 && (tileY >= 24 && tileY <= 28)) {
-                Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 1 desde X=" + tileX + ", Y=" + tileY);
-                startTransitionBackToMap1FromMap2();
-            }
-
-            if (mapPath.equals("Mapa/Mapa2.tmx") && tileX == 45 && tileY == 28) {
-                Gdx.app.log("TRANSITION", "Iniciando transición a Centro Pokémon desde Mapa 2");
-                startTransitionToPokemonCenterFromMap2();
-            }
-
-            // Transición de Mapa 1 a Mapa 3 (Tiles 49, 21-25)
-            if (mapPath.equals("Mapa/mapa11.tmx") && tileX == 49 && (tileY >= 21 && tileY <= 25)) {
-                Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 3 desde X=" + tileX + ", Y=" + tileY);
-                startTransitionToMap3();
-            }
-
-            // Transición de Mapa 3 a Centro Pokémon (Tile 25, 34)
-            if (mapPath.equals("Mapa/MAPA3.tmx") && tileX == 25 && tileY == 34) {
-                Gdx.app.log("TRANSITION", "Iniciando transición a Centro Pokémon desde Mapa 3");
-                startTransitionToPokemonCenterFromMap3();
-            }
-
-            // Transición de Mapa 3 a Mapa 1 (Borde Izquierdo X=0, Y=22-30)
-            if (mapPath.equals("Mapa/MAPA3.tmx") && tileX == 0 && (tileY >= 22 && tileY <= 30)) {
-                Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 1 desde Mapa 3");
-                startTransitionBackToMap1FromMap3();
-            }
-
-            // Transición de Mapa 1 a Mapa 4 (Tiles 22-27, 49)
-            if (mapPath.equals("Mapa/mapa11.tmx") && tileY == 49 && (tileX >= 22 && tileX <= 27)) {
-                Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 4 desde X=" + tileX + ", Y=" + tileY);
-                startTransitionToMap4();
-            }
-
-            // Transición de Mapa 4 a Mapa 1 (Borde Inferior Y=0)
-            if (mapPath.equals("Mapa/MAPA 4.tmx") && tileY == 0 && (tileX >= 22 && tileX <= 27)) {
-                Gdx.app.log("TRANSITION", "Iniciando transición a Mapa 1 desde Mapa 4");
-                startTransitionBackToMap1FromMap4();
-            }
         }
     }
 
@@ -3747,7 +3661,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     private void renderArceusMarker(float delta) {
-        if (!mapPath.contains("mapa11.tmx"))
+        if (!mapPath.contains("MAPACOMPLETO.tmx"))
             return;
 
         arceusMarkerTimer += delta;
@@ -3763,8 +3677,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         float tileWidth = map.getProperties().get("tilewidth", Integer.class);
         float tileHeight = map.getProperties().get("tileheight", Integer.class);
 
-        float worldX = 13 * tileWidth * UNIT_SCALE + (tileWidth * UNIT_SCALE / 2);
-        float worldY = 5 * tileHeight * UNIT_SCALE + (tileHeight * UNIT_SCALE / 2);
+        float worldX = 47 * tileWidth * UNIT_SCALE + (tileWidth * UNIT_SCALE / 2);
+        float worldY = 12 * tileHeight * UNIT_SCALE + (tileHeight * UNIT_SCALE / 2);
 
         shapeRenderer.setProjectionMatrix(camera.combined);
         Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
@@ -3815,6 +3729,22 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 inventorySubmenuTable.setVisible(false);
                 pauseMenuTable.setVisible(true);
                 return true;
+            } else if (currentState == GameState.POKEMONES_MENU) {
+                currentState = GameState.PAUSED;
+                pokemonesMenuTable.setVisible(false);
+                pauseMenuTable.setVisible(true);
+                updatePauseMenuSelection(selectedIndex);
+                return true;
+            } else if (currentState == GameState.TYPES_MENU) {
+                currentState = GameState.POKEMONES_MENU;
+                typesMenuTable.setVisible(false);
+                pokemonesMenuTable.setVisible(true);
+                return true;
+            } else if (currentState == GameState.ATTACKS_MENU) {
+                currentState = GameState.POKEMONES_MENU;
+                attacksMenuTable.setVisible(false);
+                pokemonesMenuTable.setVisible(true);
+                return true;
             } else if (currentState == GameState.CRAFTING) {
                 // Back to Submenu
                 currentState = GameState.INVENTORY_SUBMENU;
@@ -3832,6 +3762,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 currentState = GameState.PAUSED;
                 pokedexSubmenuTable.setVisible(false);
                 pauseMenuTable.setVisible(true);
+                updatePauseMenuSelection(selectedIndex);
                 return true;
             } else if (currentState == GameState.POKEDEX) {
                 showPokedexMenu(); // Back to submenu
@@ -3883,10 +3814,24 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // 5. Manejo del MENÚ DE INVENTARIO
         if (currentState == GameState.INVENTORY) {
+            if (keycode == Keys.UP || keycode == Keys.DOWN) {
+                ScrollPane scrollPane = (ScrollPane) inventoryMenuTable.findActor("inventoryScrollPane");
+                if (scrollPane != null) {
+                    float scrollAmount = 50f;
+                    if (keycode == Keys.UP) {
+                        scrollPane.setScrollY(scrollPane.getScrollY() - scrollAmount);
+                    } else {
+                        scrollPane.setScrollY(scrollPane.getScrollY() + scrollAmount);
+                    }
+                }
+                return true;
+            }
+
             if (keycode == Keys.ESCAPE || keycode == Keys.ENTER || keycode == Keys.Z) {
                 currentState = GameState.PAUSED;
                 inventoryMenuTable.setVisible(false);
                 pauseMenuTable.setVisible(true);
+                updatePauseMenuSelection(selectedIndex);
                 return true;
             }
             return false;
@@ -3915,7 +3860,82 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     currentState = GameState.PAUSED;
                     pokedexSubmenuTable.setVisible(false);
                     pauseMenuTable.setVisible(true);
+                    updatePauseMenuSelection(selectedIndex);
                 }
+                return true;
+            }
+            return false;
+        }
+
+        // 5.7 Manejo de POKEMONES MENU
+        if (currentState == GameState.POKEMONES_MENU) {
+            if (keycode == Keys.UP) {
+                selectedPokemonesMenuIndex = (selectedPokemonesMenuIndex - 1 + 3) % 3;
+                updatePokemonesMenuUI();
+                return true;
+            }
+            if (keycode == Keys.DOWN) {
+                selectedPokemonesMenuIndex = (selectedPokemonesMenuIndex + 1) % 3;
+                updatePokemonesMenuUI();
+                return true;
+            }
+            if (keycode == Keys.ENTER || keycode == Keys.Z) {
+                if (selectedPokemonesMenuIndex == 0) {
+                    showTypesDisplay();
+                } else if (selectedPokemonesMenuIndex == 1) {
+                    showAttacksDisplay();
+                } else if (selectedPokemonesMenuIndex == 2) {
+                    currentState = GameState.PAUSED;
+                    pokemonesMenuTable.setVisible(false);
+                    pauseMenuTable.setVisible(true);
+                    updatePauseMenuSelection(selectedIndex);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        // 5.8 Manejo de TYPES MENU (Scrolling)
+        if (currentState == GameState.TYPES_MENU) {
+            if (keycode == Keys.UP || keycode == Keys.DOWN) {
+                ScrollPane scrollPane = (ScrollPane) typesMenuTable.findActor("typesScrollPane");
+                if (scrollPane != null) {
+                    float scrollAmount = 50f;
+                    if (keycode == Keys.UP) {
+                        scrollPane.setScrollY(scrollPane.getScrollY() - scrollAmount);
+                    } else {
+                        scrollPane.setScrollY(scrollPane.getScrollY() + scrollAmount);
+                    }
+                }
+                return true;
+            }
+            if (keycode == Keys.ENTER || keycode == Keys.Z || keycode == Keys.ESCAPE || keycode == Keys.X) {
+                currentState = GameState.POKEMONES_MENU;
+                typesMenuTable.setVisible(false);
+                pokemonesMenuTable.setVisible(true);
+                return true;
+            }
+            return false;
+        }
+
+        // 5.9 Manejo de ATTACKS MENU (Scrolling)
+        if (currentState == GameState.ATTACKS_MENU) {
+            if (keycode == Keys.UP || keycode == Keys.DOWN) {
+                ScrollPane scrollPane = (ScrollPane) attacksMenuTable.findActor("attacksScrollPane");
+                if (scrollPane != null) {
+                    float scrollAmount = 50f;
+                    if (keycode == Keys.UP) {
+                        scrollPane.setScrollY(scrollPane.getScrollY() - scrollAmount);
+                    } else {
+                        scrollPane.setScrollY(scrollPane.getScrollY() + scrollAmount);
+                    }
+                }
+                return true;
+            }
+            if (keycode == Keys.ENTER || keycode == Keys.Z || keycode == Keys.ESCAPE || keycode == Keys.X) {
+                currentState = GameState.POKEMONES_MENU;
+                attacksMenuTable.setVisible(false);
+                pokemonesMenuTable.setVisible(true);
                 return true;
             }
             return false;
@@ -4039,7 +4059,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return false;
         }
 
-        // 5. Interacción con ARCEUS (Batalla Final) - Tile 13, 5
+        // 5. Interacción con ARCEUS (Batalla Final) - Tile 47, 12
         if ((keycode == Keys.ENTER || keycode == Keys.Z) && currentState == GameState.FREE_ROAMING) {
             float tileWidth = map.getProperties().get("tilewidth", Integer.class);
             float tileHeight = map.getProperties().get("tileheight", Integer.class);
@@ -4048,8 +4068,26 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             int centerX = (int) ((characterActor.getX() + characterActor.getWidth() / 2) / (tileWidth * UNIT_SCALE));
             int centerY = (int) ((characterActor.getY() + characterActor.getHeight() / 2) / (tileHeight * UNIT_SCALE));
 
-            if (centerX == 13 && centerY == 5 && mapPath.contains("mapa11.tmx")) {
-                startArceusBattleDialogue();
+            if (centerX == 47 && centerY == 12 && mapPath.contains("MAPACOMPLETO.tmx")) {
+                // Verificar requisito: 5 Pokémon nivel 10
+                int level10Count = 0;
+                for (Pokemon p : sodyl.proyecto.clases.Pokedex.getCollected()) {
+                    if (p.getNivel() >= 10) {
+                        level10Count++;
+                    }
+                }
+
+                if (level10Count < 5) {
+                    dialogueQueue.clear();
+                    dialogueQueue.add("Escuchas una voz en tu mente...");
+                    dialogueQueue.add("\"No eres lo suficientemente fuerte para desafiar a la leyenda.\"");
+                    dialogueQueue.add("\"Necesitas al menos 5 Pokémon al nivel 10 para entrar al santuario.\"");
+                    dialogueQueue.add("(Actualmente tienes " + level10Count + " Pokémon de nivel 10)");
+                    currentState = GameState.DIALOGUE;
+                    processNextDialogueLine();
+                } else {
+                    startArceusBattleDialogue();
+                }
                 return true;
             }
         }
@@ -4069,6 +4107,85 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             int tileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
             int tileY = (int) (playerCenterY / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
 
+            // --- BATTLE NPC INTERACTION ---
+            if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+                if (tileX >= 40 && tileX <= 42 && tileY >= 37 && tileY <= 39) {
+                    if (game.getDefeatedNPCs().contains("Kaneki")) {
+                        showArceusChallenge("Kaneki",
+                                "... Arceus te espera en el santuario. Sólo él puede terminar con esta tragedia constante.");
+                    } else {
+                        startNPCBattle("Kaneki", "Charizard");
+                    }
+                    return true;
+                } else if (tileX >= 50 && tileX <= 52 && tileY >= 48 && tileY <= 50) {
+                    if (game.getDefeatedNPCs().contains("Jesucristo")) {
+                        showArceusChallenge("Jesucristo",
+                                "Hijo mío, tu fe es fuerte. Ahora, ve y enfrenta el juicio final ante Arceus.");
+                    } else {
+                        startNPCBattle("Jesucristo", "Lucario");
+                    }
+                    return true;
+                } else if (tileX >= 85 && tileX <= 87 && tileY >= 50 && tileY <= 52) {
+                    if (game.getDefeatedNPCs().contains("William Afton")) {
+                        showArceusChallenge("William Afton",
+                                "He visto el fin... y Arceus está en el centro. Ve, ¡él te espera para tu experimento final!");
+                    } else {
+                        startNPCBattle("William Afton", "Mewtwo");
+                    }
+                    return true;
+                } else if (tileX >= 98 && tileX <= 100 && tileY >= 25 && tileY <= 27) {
+                    if (game.getDefeatedNPCs().contains("Pennywise")) {
+                        showArceusChallenge("Pennywise",
+                                "¡Ji ji ji! ¡Arceus quiere jugar contigo arriba! ¡Todos flotamos con él!");
+                    } else {
+                        startNPCBattle("Pennywise", "Gyarados");
+                    }
+                    return true;
+                } else if (tileX >= 9 && tileX <= 11 && tileY >= 26 && tileY <= 28) {
+                    if (game.getDefeatedNPCs().contains("Jotaro")) {
+                        showArceusChallenge("Jotaro",
+                                "Ya no tengo nada que enseñarte. Arceus es el único que queda. Ve por él... yare yare daze.");
+                    } else {
+                        startNPCBattle("Jotaro", "Blastoise");
+                    }
+                    return true;
+                } else if (tileX >= 142 && tileX <= 144 && tileY >= 21 && tileY <= 23) {
+                    if (game.getDefeatedNPCs().contains("Don Valerio")) {
+                        showArceusChallenge("Don Valerio",
+                                "Los espíritus dicen que tu destino está sellado con Arceus. El santuario te llama.");
+                    } else {
+                        startNPCBattle("Don Valerio", "Sylveon");
+                    }
+                    return true;
+                } else if (tileX >= 26 && tileX <= 28 && tileY >= 37 && tileY <= 39) {
+                    if (game.getDefeatedNPCs().contains("Giorno")) {
+                        showArceusChallenge("Giorno",
+                                "Has demostrado tener una resolución dorada. Tu camino termina con Arceus. Ve y cumple tu sueño.");
+                    } else {
+                        startNPCBattle("Giorno", "Serperior");
+                    }
+                    return true;
+                }
+
+                // DIALOGUE NPCs
+                if (tileX >= 29 && tileX <= 31 && tileY >= 25 && tileY <= 27) {
+                    startDialogueNPCInteraction("Bonnie");
+                    return true;
+                } else if (tileX >= 64 && tileX <= 66 && tileY >= 25 && tileY <= 27) {
+                    startDialogueNPCInteraction("Funtime Foxy");
+                    return true;
+                } else if (tileX >= 74 && tileX <= 76 && tileY >= 29 && tileY <= 31) {
+                    startDialogueNPCInteraction("Circus Baby");
+                    return true;
+                } else if (tileX >= 76 && tileX <= 78 && tileY >= 49 && tileY <= 51) {
+                    startDialogueNPCInteraction("Foxy");
+                    return true;
+                } else if (tileX >= 92 && tileX <= 94 && tileY >= 19 && tileY <= 21) {
+                    startDialogueNPCInteraction("Freddy");
+                    return true;
+                }
+            }
+
             // Check if player is at the special event coordinates
             if (tileX == 21 && tileY == 48) {
                 TiledMapTileLayer layer = (TiledMapTileLayer) map.getLayers().get("NIvel 1");
@@ -4087,7 +4204,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             for (int i = collectibles.size - 1; i >= 0; i--) {
                 Collectible collectible = collectibles.get(i);
 
-                if (collectible.isInRange(playerCenterX, playerCenterY)) {
+                if (!collectible.isCollected() && collectible.isInRange(playerCenterX, playerCenterY)) {
 
                     int itemId = collectible.getItemId();
                     int quantityToCollect = collectible.getQuantity();
@@ -4107,8 +4224,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                                     + " no cabe, ¡tu inventario está lleno (" + Inventario.MAX_QUANTITY + ")!");
                         }
 
-                        collectible.getActor().remove();
-                        collectibles.removeIndex(i);
+                        collectible.setCollected(true);
 
                         collectedSomething = true;
                     } else {
@@ -4162,328 +4278,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 }
             }
 
-            // Interaction with CircusBaby NPC at (27, 34) on Map 1
-            if (mapPath.equals("Mapa/mapa11.tmx")) {
-                int pTileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
-                int pTileY = (int) (playerCenterY
-                        / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
-
-                // If player is close to 27, 34
-                if (Math.abs(pTileX - 27) <= 1 && Math.abs(pTileY - 34) <= 1) {
-                    dialogueQueue = new LinkedList<>();
-                    dialogueQueue.add("¡Hola! Soy Circus Baby. Me encanta este ambiente tan calmado.");
-                    dialogueQueue.add("¿Sabías que en este pueblo hay cuatro zonas donde aparecen pokemones?");
-                    dialogueQueue.add(
-                            "Los pokemones que aparecen son: Rowlet, Yvasur, Serperior y Pikachu. Si buscas otros, tal vez deberías echarle un vistazo a los otros pueblos");
-                    dialogueQueue.add("¡Buena suerte en tu aventura!");
-
-                    currentState = GameState.DIALOGUE;
-                    processNextDialogueLine();
-                    return true;
-                }
-
-                // Interaction with Funtime Foxy NPC at (16, 24) on Map 1
-                if (Math.abs(pTileX - 16) <= 1 && Math.abs(pTileY - 24) <= 1) {
-                    dialogueQueue = new LinkedList<>();
-                    dialogueQueue.add(
-                            "¡Hola! ¿Cómo estás? Soy Funtime Foxy. ¿Sabías que al norte (donde hay un jardín) aparecen pokemones?");
-                    dialogueQueue.add(
-                            "Pero, ¡cuidado! No te dirijas sin antes saber esto: los pokemones son criaturas salvajes que quizás no sean tan amigables con las personas del pueblo...es por eso que puede que tengas una pequeña lucha con ellos.");
-                    dialogueQueue.add(
-                            "En la batalla de pokemones, presiona LUCHAR para elegir el ataque que usará tu pokemón. Los ataques no son infinitos, tienen un límite de uso según su poder.");
-                    dialogueQueue.add(
-                            "En MOCHILA, puedes elegir CAPTURAR para intentar atrapar a un pokemón (esto funciona solo si el pokemón rival está debilitado). También puedes elegir CURAR para restaurar una parte de la vida de tu pokemón.");
-                    dialogueQueue.add(
-                            "En POKEMON, tienes la opción de cambiar el pokemón de combate (esto es útil si ves que tu pokemón es débil ante el rival). No se puede cambiar por cualquier pokemón de tu pokédex, sino por un EQUIPO POKEMÓN elegido anteriormente.");
-                    dialogueQueue.add(
-                            "Para elegir un equipo pokemón, debes poseer al menos 3 pokemones. Finalmente, si crees que no puedes ganar la batalla, tienes la opción de HUIR y evitar ese combate. ¡Buena suerte en tu aventura!");
-
-                    currentState = GameState.DIALOGUE;
-                    processNextDialogueLine();
-                    return true;
-                }
-
-                // Interaction with Funtime Freddy NPC at (23, 13) on Map 1
-                if (Math.abs(pTileX - 19) <= 1 && Math.abs(pTileY - 13) <= 1) {
-                    dialogueQueue = new LinkedList<>();
-                    dialogueQueue.add(
-                            "¡Hola, entrenador! Soy Funtime Freddy. ¿Sabías que este pueblo no es el único lugar que puedes explorar?");
-                    dialogueQueue.add(
-                            "Si te diriges hacia el oeste (izquierda), encontrarás un camino que te llevará a otro mapa lleno de nuevas aventuras y pokemones diferentes.");
-                    dialogueQueue.add(
-                            "Mientras exploras, no olvides recoger objetos que encuentres en el suelo. Estos materiales son muy útiles para craftear objetos como Pokéballs y pociones.");
-                    dialogueQueue.add(
-                            "Ah, y si tus pokemones están heridos después de una batalla, visita el Centro Pokémon. Está ubicado al norte de aquí, cerca del jardín. ¡La enfermera curará a todos tus pokemones sin costo alguno!");
-                    dialogueQueue.add(
-                            "Recuerda: explorar, recolectar y cuidar de tus pokemones son las claves para convertirte en un gran entrenador. ¡Buena suerte!");
-
-                    currentState = GameState.DIALOGUE;
-                    processNextDialogueLine();
-                    return true;
-                }
-            }
-
-            // Interaction with Battle NPCs on Map 2
-            if (mapPath.equals("Mapa/Mapa2.tmx")) {
-                int pTileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
-                int pTileY = (int) (playerCenterY
-                        / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
-
-                // Freddy Map 2 Info at (29, 29)
-                if (Math.abs(pTileX - 29) <= 1 && Math.abs(pTileY - 29) <= 1) {
-                    dialogueQueue = new LinkedList<>();
-                    dialogueQueue.add("¡Hola! Soy Freddy.");
-                    dialogueQueue.add("Este lugar es el hogar de Pokémon de tipo Agua.");
-                    dialogueQueue.add("Podrás encontrar fácilmente a Oshawott.");
-                    dialogueQueue.add("También he visto a Vaporeon y Sylveon paseando por la hierba.");
-                    dialogueQueue.add("¡Ten cuidado! Un poderoso Blastoise protege esta zona.");
-                    dialogueQueue.add("Ah, y a veces aparece Jolteon, ¡es muy rápido!");
-
-                    currentState = GameState.DIALOGUE;
-                    processNextDialogueLine();
-                    return true;
-                }
-
-                // Giorno at (4, 51) - Jolteon
-                if (Math.abs(pTileX - 4) <= 1 && Math.abs(pTileY - 51) <= 1) {
-                    if (!giornoDefeated) {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("¡Alto ahí, entrenador!");
-                        dialogueQueue.add("Soy Giorno Giovanna, y tengo un sueño...");
-                        dialogueQueue.add("¡Demostrar que mi Jolteon es el más rápido de todos!");
-                        dialogueQueue.add("¿Aceptas mi desafío?");
-
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-
-                        // Set up battle after dialogue
-                        onDialogCompleteAction = new Runnable() {
-
-                            @Override
-                            public void run() {
-                                startNPCBattle("Jolteon", "Giorno");
-                            }
-                        };
-                    } else {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("¡Increíble batalla! Tu habilidad es admirable.");
-                        dialogueQueue.add("Sigue entrenando y alcanzarás tu sueño.");
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-                    }
-                    return true;
-                }
-
-                // Jotaro at (10, 33) - Blastoise
-                if (Math.abs(pTileX - 10) <= 1 && Math.abs(pTileY - 33) <= 1) {
-                    if (!jotaroDefeated) {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Yare yare daze...");
-                        dialogueQueue.add("Parece que tenemos un entrenador valiente aquí.");
-                        dialogueQueue.add("Mi Blastoise y yo hemos enfrentado muchos desafíos.");
-                        dialogueQueue.add("¿Estás listo para enfrentarnos?");
-
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-
-                        onDialogCompleteAction = new Runnable() {
-                            @Override
-                            public void run() {
-                                startNPCBattle("Blastoise", "Jotaro");
-                            }
-                        };
-                    } else {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Yare yare... no está mal.");
-                        dialogueQueue.add("Tienes potencial. Sigue así.");
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-                    }
-                    return true;
-                }
-
-                // Kaneki at (41, 44) - Mewtwo
-                if (Math.abs(pTileX - 41) <= 1 && Math.abs(pTileY - 44) <= 1) {
-                    if (!kanekiDefeated) {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Este mundo... está lleno de batallas.");
-                        dialogueQueue.add("He aprendido a sobrevivir en la oscuridad.");
-                        dialogueQueue.add("Mi Mewtwo y yo somos uno. Nuestro poder es absoluto.");
-                        dialogueQueue.add("¿Tienes el coraje de enfrentarnos?");
-
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-
-                        onDialogCompleteAction = new Runnable() {
-
-                            @Override
-                            public void run() {
-                                startNPCBattle("Mewtwo", "Kaneki");
-                            }
-                        };
-                    } else {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Eres fuerte... muy fuerte.");
-                        dialogueQueue.add("Quizás hay esperanza en este mundo después de todo.");
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-                    }
-                    return true;
-                }
-            }
-
-            // --- MAP 3 NPCS ---
-            if (mapPath.equals("Mapa/MAPA3.tmx")) {
-
-                int pTileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
-                int pTileY = (int) (playerCenterY
-                        / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
-
-                // Pennywise at (14, 23)
-                if (Math.abs(pTileX - 14) <= 1 && Math.abs(pTileY - 23) <= 1) {
-                    if (!pennywiseDefeated) {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Hola, Georgie...");
-                        dialogueQueue.add("¿Quieres un globo?");
-                        dialogueQueue.add("¡Aquí abajo todos flotan!");
-                        dialogueQueue.add("¡Y tú también flotarás!");
-
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-
-                        onDialogCompleteAction = new Runnable() {
-                            @Override
-                            public void run() {
-                                startNPCBattle("Gyarados", "Pennywise");
-                            }
-                        };
-                    } else {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("¡Imposible! ¡No te tengo miedo!");
-                        dialogueQueue.add("Te has vuelto fuerte...");
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-                    }
-                    return true;
-                }
-
-                // Bonnie at (4, 28)
-                if (Math.abs(pTileX - 4) <= 1 && Math.abs(pTileY - 28) <= 1) {
-                    dialogueQueue = new LinkedList<>();
-                    dialogueQueue.add("¡Hola! ¿Has visto a los Pokémon de aquí?");
-                    dialogueQueue.add("Dicen que se pueden encontrar varias evoluciones de Eevee.");
-                    dialogueQueue.add("He visto a Vaporeon, Jolteon y Flareon merodeando.");
-                    dialogueQueue.add("¡También un Ivysaur suele aparecer por los jardines!");
-                    dialogueQueue.add("Buena suerte atrapándolos a todos.");
-
-                    currentState = GameState.DIALOGUE;
-                    processNextDialogueLine();
-                    return true;
-                }
-
-                // Don Valerio at (44, 30)
-                if (Math.abs(pTileX - 44) <= 1 && Math.abs(pTileY - 30) <= 1) {
-                    if (!donValerioDefeated) {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("¡Alto ahí, joven!");
-                        dialogueQueue.add("Soy Don Valerio, el guardián de estas tierras.");
-                        dialogueQueue.add("Mis años de experiencia te enseñarán respeto.");
-                        dialogueQueue.add("¡Prepárate para una lección!");
-
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-
-                        onDialogCompleteAction = new Runnable() {
-                            @Override
-                            public void run() {
-                                startNPCBattle("Sylveon", "Don Valerio");
-                            }
-                        };
-                    } else {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Jojo... no está nada mal para un joven.");
-                        dialogueQueue.add("Tienes carácter. Sigue tu camino.");
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-                    }
-                    return true;
-                }
-            }
-
-            // --- MAP 4 NPCS ---
-            if (mapPath.equals("Mapa/MAPA 4.tmx")) {
-                int pTileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
-                int pTileY = (int) (playerCenterY
-                        / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
-
-                // Jesucristo at (2, 4)
-                if (Math.abs(pTileX - 2) <= 1 && Math.abs(pTileY - 4) <= 1) {
-                    if (!jesucristoDefeated) {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Hijo mío, has recorrido un largo camino.");
-                        dialogueQueue.add("Pero para alcanzar la salvación, debes probar tu fuerza.");
-                        dialogueQueue.add("¿Estás listo para enfrentar la luz?");
-
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-
-                        onDialogCompleteAction = new Runnable() {
-                            @Override
-                            public void run() {
-                                startNPCBattle("Lucario", "Jesucristo");
-                            }
-                        };
-                    } else {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Ve en paz, hijo mío.");
-                        dialogueQueue.add("La luz siempre te acompañará.");
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-                    }
-                    return true;
-                }
-
-                // Afton at (45, 4)
-                if (Math.abs(pTileX - 45) <= 1 && Math.abs(pTileY - 4) <= 1) {
-                    if (!aftonDefeated) {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("No deberías estar aquí...");
-                        dialogueQueue.add("He vuelto... siempre vuelvo.");
-                        dialogueQueue.add("Ahora, tu alma será mía.");
-
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-
-                        onDialogCompleteAction = new Runnable() {
-                            @Override
-                            public void run() {
-                                startNPCBattle("Mewtwo", "Afton");
-                            }
-                        };
-                    } else {
-                        dialogueQueue = new LinkedList<>();
-                        dialogueQueue.add("Volveré...");
-                        dialogueQueue.add("Siempre vuelvo...");
-                        currentState = GameState.DIALOGUE;
-                        processNextDialogueLine();
-                    }
-                    return true;
-                }
-
-                // Info NPC at (21, 12)
-                if (Math.abs(pTileX - 21) <= 1 && Math.abs(pTileY - 12) <= 1) {
-                    dialogueQueue = new LinkedList<>();
-                    dialogueQueue.add("¡Hola viajero! Este lugar es peligroso.");
-                    dialogueQueue.add("En estas tierras volcánicas aparecen Pokémon muy fuertes.");
-                    dialogueQueue.add("Podrás encontrar a Cyndaquil, Flareon y Charizard.");
-                    dialogueQueue.add("¡Incluso se dice que un Gyarados habita en las zonas de lava!");
-                    dialogueQueue.add("Ten mucho cuidado.");
-
-                    currentState = GameState.DIALOGUE;
-                    processNextDialogueLine();
-                    return true;
-                }
-            }
         }
 
         // 7. Manejo de MOVIMIENTO (solo si FREE_ROAMING)
@@ -4577,23 +4371,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             // But with FitViewport, the virtual size is constant, so this might be
             // redundant or just safe
             dialogBox.resize(uiStage.getWidth(), uiStage.getHeight());
-        }
-    }
-
-    @Override
-    public void pause() {
-    }
-
-    @Override
-    public void resume() {
-    }
-
-    @Override
-    public void hide() {
-        // NO destruir recursos si solo estamos yendo a una batalla
-        // Solo destruir si realmente estamos saliendo de la pantalla
-        if (currentState != GameState.BATTLE) {
-            dispose();
         }
     }
 
@@ -4695,8 +4472,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Label.LabelStyle seenStyle = new Label.LabelStyle(font, Color.GRAY);
         Label.LabelStyle researchStyle = new Label.LabelStyle(font, Color.CYAN);
         Label.LabelStyle teamStyle = new Label.LabelStyle(font, Color.GREEN);
-        Label.LabelStyle infoStyle = new Label.LabelStyle(font, new Color(0.9f, 0.9f, 0.6f, 1f)); // Light yellow for
-                                                                                                  // stats
 
         Set<String> seenPokemon = sodyl.proyecto.clases.Pokedex.getSeen();
         Map<String, Integer> researchLevels = sodyl.proyecto.clases.Pokedex.getResearchLevels();
@@ -4782,6 +4557,165 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     inTeam ? teamStyle : (i == selectedTeamIndex ? selectedStyle : style));
             teamSelectionTable.add(label).left().pad(5).row();
         }
+    }
+
+    private void initializePokemonesMenu() {
+        Texture darkBackground = createColoredTexture(new Color(0.1f, 0.1f, 0.1f, 0.9f));
+        TextureRegionDrawable backgroundDrawable = new TextureRegionDrawable(darkBackground);
+
+        // --- 1. POKEMONES MAIN MENU ---
+        pokemonesMenuTable = new Table();
+        pokemonesMenuTable.setFillParent(true);
+        pokemonesMenuTable.setBackground(backgroundDrawable);
+        pokemonesMenuTable.pad(50);
+        pokemonesMenuTable.setVisible(false);
+        uiStage.addActor(pokemonesMenuTable);
+
+        // --- 2. TYPES DISPLAY ---
+        typesMenuTable = new Table();
+        typesMenuTable.setFillParent(true);
+        typesMenuTable.setBackground(backgroundDrawable);
+        typesMenuTable.pad(50);
+        typesMenuTable.setVisible(false);
+        uiStage.addActor(typesMenuTable);
+
+        // --- 3. ATTACKS DISPLAY ---
+        attacksMenuTable = new Table();
+        attacksMenuTable.setFillParent(true);
+        attacksMenuTable.setBackground(backgroundDrawable);
+        attacksMenuTable.pad(50);
+        attacksMenuTable.setVisible(false);
+        uiStage.addActor(attacksMenuTable);
+    }
+
+    private void showPokemonesMenu() {
+        currentState = GameState.POKEMONES_MENU;
+        pauseMenuTable.setVisible(false);
+        pokemonesMenuTable.setVisible(true);
+        selectedPokemonesMenuIndex = 0;
+        updatePokemonesMenuUI();
+    }
+
+    private void updatePokemonesMenuUI() {
+        pokemonesMenuTable.clearChildren();
+        Label.LabelStyle style = new Label.LabelStyle(font, Color.WHITE);
+        Label.LabelStyle selectedStyle = new Label.LabelStyle(font, Color.YELLOW);
+
+        pokemonesMenuTable.add(new Label("--- DATOS POKÉMON ---", new Label.LabelStyle(font, Color.CYAN)))
+                .padBottom(30).row();
+
+        String[] options = { "Tipos", "Ataques", "Volver" };
+        for (int i = 0; i < options.length; i++) {
+            Label.LabelStyle currentStyle = (i == selectedPokemonesMenuIndex) ? selectedStyle : style;
+            pokemonesMenuTable
+                    .add(new Label((i == selectedPokemonesMenuIndex ? "> " : "  ") + options[i], currentStyle))
+                    .pad(10).row();
+        }
+    }
+
+    private void showTypesDisplay() {
+        currentState = GameState.TYPES_MENU;
+        pokemonesMenuTable.setVisible(false);
+        typesMenuTable.setVisible(true);
+        updateTypesDisplay();
+    }
+
+    private void updateTypesDisplay() {
+        typesMenuTable.clearChildren();
+        Label.LabelStyle titleStyle = new Label.LabelStyle(font, Color.YELLOW);
+        Label.LabelStyle typeStyle = new Label.LabelStyle(font, Color.CYAN);
+        Label.LabelStyle infoStyle = new Label.LabelStyle(font, Color.WHITE);
+        Label.LabelStyle strongStyle = new Label.LabelStyle(font, Color.GREEN);
+        Label.LabelStyle weakStyle = new Label.LabelStyle(font, Color.RED);
+
+        typesMenuTable.add(new Label("--- TABLA DE TIPOS ---", titleStyle)).padBottom(20).row();
+
+        Table content = new Table();
+        content.top().left();
+
+        for (sodyl.proyecto.clases.TiposPokemon type : sodyl.proyecto.clases.TiposPokemon.values()) {
+            content.add(new Label("[" + type.name() + "]", typeStyle)).left().padTop(15).row();
+
+            // Súper efectivo contra
+            StringBuilder strongBuilder = new StringBuilder("Fuerte contra: ");
+            boolean firstStrong = true;
+            // Débil contra
+            StringBuilder weakBuilder = new StringBuilder("Débil contra: ");
+            boolean firstWeak = true;
+
+            for (sodyl.proyecto.clases.TiposPokemon other : sodyl.proyecto.clases.TiposPokemon.values()) {
+                double mult = sodyl.proyecto.clases.TablaEficacia.getMultiplicador(type, other);
+                if (mult > 1.0) {
+                    if (!firstStrong)
+                        strongBuilder.append(", ");
+                    strongBuilder.append(other.name());
+                    firstStrong = false;
+                } else if (mult < 1.0) {
+                    if (!firstWeak)
+                        weakBuilder.append(", ");
+                    weakBuilder.append(other.name());
+                    firstWeak = false;
+                }
+            }
+
+            if (firstStrong)
+                strongBuilder.append("Nada");
+            if (firstWeak)
+                weakBuilder.append("Nada");
+
+            content.add(new Label(strongBuilder.toString(), strongStyle)).left().padLeft(20).row();
+            content.add(new Label(weakBuilder.toString(), weakStyle)).left().padLeft(20).row();
+        }
+
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+        scroll.setName("typesScrollPane");
+        typesMenuTable.add(scroll).expand().fill().row();
+
+        typesMenuTable.add(new Label("Presiona Z o ENTER para volver", infoStyle)).padTop(10).row();
+    }
+
+    private void showAttacksDisplay() {
+        currentState = GameState.ATTACKS_MENU;
+        pokemonesMenuTable.setVisible(false);
+        attacksMenuTable.setVisible(true);
+        updateAttacksDisplay();
+    }
+
+    private void updateAttacksDisplay() {
+        attacksMenuTable.clearChildren();
+        Label.LabelStyle titleStyle = new Label.LabelStyle(font, Color.YELLOW);
+        Label.LabelStyle headerStyle = new Label.LabelStyle(font, Color.CYAN);
+        Label.LabelStyle contentStyle = new Label.LabelStyle(font, Color.WHITE);
+
+        attacksMenuTable.add(new Label("--- LISTA DE ATAQUES ---", titleStyle)).padBottom(20).row();
+
+        Table content = new Table();
+        content.top().left();
+
+        // Header
+        content.add(new Label("NOMBRE", headerStyle)).width(250).left();
+        content.add(new Label("TIPO", headerStyle)).width(150).left();
+        content.add(new Label("DAÑO", headerStyle)).width(100).right().row();
+        content.add().colspan(3).height(10).row();
+
+        java.util.List<sodyl.proyecto.clases.TiposAtaque> attacks = sodyl.proyecto.clases.Pokemones.getAllAttacks();
+        // Sort by power or type if needed, but for now just display
+        for (sodyl.proyecto.clases.TiposAtaque atk : attacks) {
+            content.add(new Label(atk.nombre, contentStyle)).left();
+            content.add(new Label(atk.tipo.name(), contentStyle)).left();
+            content.add(new Label(String.valueOf(atk.danoBase), contentStyle)).right().row();
+            content.add().colspan(3).height(5).row();
+        }
+
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+        scroll.setName("attacksScrollPane");
+        attacksMenuTable.add(scroll).expand().fill().row();
+
+        attacksMenuTable.add(new Label("Presiona Z o ENTER para volver", contentStyle)).padTop(10).row();
     }
 
     private void toggleTeamSelection() {
@@ -4916,41 +4850,92 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
     }
 
+    public void saveGame() {
+        if (characterActor == null)
+            return;
+        game.saveProgress(playerInventory, mapPath, characterActor.getX(), characterActor.getY());
+    }
+
+    @Override
+    public void pause() {
+        saveGame();
+    }
+
+    @Override
+    public void hide() {
+        saveGame();
+        // NO destruir recursos si solo estamos yendo a una batalla
+        // Solo destruir si realmente estamos saliendo de la pantalla
+        if (currentState != GameState.BATTLE) {
+            dispose();
+        }
+    }
+
+    @Override
+    public void resume() {
+    }
+
     @Override
     public void dispose() {
-        // Dispose Map 2 NPC textures
-        if (giornoTexture1 != null)
-            giornoTexture1.dispose();
-        if (giornoTexture2 != null)
-            giornoTexture2.dispose();
-        if (jotaroTexture1 != null)
-            jotaroTexture1.dispose();
-        if (jotaroTexture2 != null)
-            jotaroTexture2.dispose();
-        if (kanekiTexture1 != null)
-            kanekiTexture1.dispose();
-        if (kanekiTexture2 != null)
-            kanekiTexture2.dispose();
 
         // Dispose other textures
-        if (circusBabyTexture1 != null)
-            circusBabyTexture1.dispose();
-        if (circusBabyTexture2 != null)
-            circusBabyTexture2.dispose();
-        if (funtimeFoxyTexture1 != null)
-            funtimeFoxyTexture1.dispose();
-        if (funtimeFoxyTexture2 != null)
-            funtimeFoxyTexture2.dispose();
-        if (funtimeFreddyTexture1 != null)
-            funtimeFreddyTexture1.dispose();
-        if (funtimeFreddyTexture2 != null)
-            funtimeFreddyTexture2.dispose();
         if (yoelTexture != null)
             yoelTexture.dispose();
         if (recepcionistaTexture != null)
             recepcionistaTexture.dispose();
+        if (bonnie1Texture != null)
+            bonnie1Texture.dispose();
+        if (bonnie2Texture != null)
+            bonnie2Texture.dispose();
+        if (fntFoxy1Texture != null)
+            fntFoxy1Texture.dispose();
+        if (fntFoxy2Texture != null)
+            fntFoxy2Texture.dispose();
+        if (circusBaby1Texture != null)
+            circusBaby1Texture.dispose();
+        if (circusBaby2Texture != null)
+            circusBaby2Texture.dispose();
+        if (foxy1Texture != null)
+            foxy1Texture.dispose();
+        if (foxy2Texture != null)
+            foxy2Texture.dispose();
+        if (freddy1Texture != null)
+            freddy1Texture.dispose();
+        if (freddy2Texture != null)
+            freddy2Texture.dispose();
+
         if (blackPixelTexture != null)
             blackPixelTexture.dispose();
+
+        // Dispose Battle NPC textures
+        if (kaneki1Texture != null)
+            kaneki1Texture.dispose();
+        if (kaneki2Texture != null)
+            kaneki2Texture.dispose();
+        if (jesucristo1Texture != null)
+            jesucristo1Texture.dispose();
+        if (jesucristo2Texture != null)
+            jesucristo2Texture.dispose();
+        if (afton1Texture != null)
+            afton1Texture.dispose();
+        if (afton2Texture != null)
+            afton2Texture.dispose();
+        if (pennywise1Texture != null)
+            pennywise1Texture.dispose();
+        if (pennywise2Texture != null)
+            pennywise2Texture.dispose();
+        if (jotaro1Texture != null)
+            jotaro1Texture.dispose();
+        if (jotaro2Texture != null)
+            jotaro2Texture.dispose();
+        if (donValerio1Texture != null)
+            donValerio1Texture.dispose();
+        if (donValerio2Texture != null)
+            donValerio2Texture.dispose();
+        if (giorno1Texture != null)
+            giorno1Texture.dispose();
+        if (giorno2Texture != null)
+            giorno2Texture.dispose();
 
         // Dispose stages and other resources
         if (stage != null)
@@ -4975,6 +4960,15 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         // Dispose item textures
         for (Texture texture : itemTextures.values()) {
             texture.dispose();
+        }
+
+        // --- DISCONNECT NETWORKING ---
+        if (isMultiplayer && conexion != null) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("tipo", "desconectar");
+            data.put("id", sodyl.proyecto.clases.UserManager.getCurrentUser());
+            conexion.enviar(data);
+            conexion.desconectar();
         }
     }
 

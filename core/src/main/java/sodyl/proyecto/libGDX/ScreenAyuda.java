@@ -21,7 +21,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
-import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
 public class ScreenAyuda implements Screen, InputProcessor {
@@ -31,6 +30,8 @@ public class ScreenAyuda implements Screen, InputProcessor {
     private Texture backgroundTexture;
     private BitmapFont fontTitle;
     private BitmapFont fontText;
+    private ScrollPane scrollPane;
+    private Texture shadowTexture;
 
     public ScreenAyuda(Proyecto game) {
         this.game = game;
@@ -46,36 +47,45 @@ public class ScreenAyuda implements Screen, InputProcessor {
         Gdx.input.setInputProcessor(multiplexer);
 
         // Background
-        backgroundTexture = new Texture(Gdx.files.internal("imagenes/fondoAyuda.png"));
+        backgroundTexture = new Texture(Gdx.files.internal("imagenes/pantallaCarga.jpg"));
         Image bgImage = new Image(backgroundTexture);
         bgImage.setFillParent(true);
         stage.addActor(bgImage);
+
+        // Shadow Overlay for contrast
+        com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1,
+                com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        pixmap.setColor(new Color(0, 0, 0, 0.6f));
+        pixmap.fill();
+        shadowTexture = new Texture(pixmap);
+        pixmap.dispose();
+        Image shadowOverlay = new Image(shadowTexture);
+        shadowOverlay.setFillParent(true);
+        stage.addActor(shadowOverlay);
 
         // Fonts
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("Mapa/ari-w9500-bold.ttf"));
 
         FreeTypeFontParameter titleParam = new FreeTypeFontParameter();
         titleParam.size = 40;
-        titleParam.color = Color.YELLOW;
-        titleParam.borderColor = Color.BLACK;
-        titleParam.borderWidth = 2;
+        titleParam.color = Color.RED;
+        titleParam.borderWidth = 0;
         fontTitle = generator.generateFont(titleParam);
 
         FreeTypeFontParameter textParam = new FreeTypeFontParameter();
         textParam.size = 24;
-        textParam.color = Color.WHITE; // Blanco base para poder teñir
-        textParam.shadowColor = Color.GRAY;
-        textParam.shadowOffsetX = 1;
-        textParam.shadowOffsetY = 1;
+        textParam.color = Color.WHITE;
+        textParam.borderColor = Color.BLACK;
+        textParam.borderWidth = 1.2f;
         fontText = generator.generateFont(textParam);
 
         generator.dispose();
 
         // Styles
         // Styles
-        LabelStyle titleStyle = new LabelStyle(fontTitle, Color.YELLOW);
-        LabelStyle headerStyle = new LabelStyle(fontText, Color.ORANGE);
-        LabelStyle textStyle = new LabelStyle(fontText, new Color(0.1f, 0.1f, 0.4f, 1f)); // Azul Oscuro
+        LabelStyle titleStyle = new LabelStyle(fontTitle, Color.RED);
+        LabelStyle headerStyle = new LabelStyle(fontText, Color.RED);
+        LabelStyle textStyle = new LabelStyle(fontText, Color.WHITE);
 
         TextButtonStyle btnStyle = new TextButtonStyle();
         btnStyle.font = fontText;
@@ -96,46 +106,86 @@ public class ScreenAyuda implements Screen, InputProcessor {
         // Content Table for ScrollPane
         Table contentTable = new Table();
         contentTable.top().left();
+        contentTable.pad(20);
 
-        // CONTROLES
-        Label controlesHeader = new Label("CONTROLES:", headerStyle);
-        contentTable.add(controlesHeader).padBottom(10).left().row();
+        float textWidth = Proyecto.PANTALLA_W * 0.75f;
 
-        String controlesText = "- Moverse: Flechas de Dirección (Arriba, Abajo, Izquierda, Derecha)\n" +
-                "- Interactuar / Confirmar: Z o ENTER\n" +
-                "- Cancelar / Menú: X o ESCAPE";
+        // 1. ¿QUÉ ES ESTE JUEGO?
+        contentTable.add(new Label("¿QUÉ ES ESTE JUEGO?", headerStyle)).padBottom(10).left().row();
+        String introText = "Este es un juego de aventura y estrategia donde exploras un mundo lleno de criaturas llamadas Pokémon. "
+                +
+                "Tu meta es convertirte en un gran entrenador, capturando Pokémon y fortaleciéndolos para el desafío final.";
+        Label introLabel = new Label(introText, textStyle);
+        introLabel.setWrap(true);
+        contentTable.add(introLabel).width(textWidth).padBottom(20).left().row();
+
+        // 2. CONTROLES
+        contentTable.add(new Label("CONTROLES BÁSICOS:", headerStyle)).padBottom(10).left().row();
+        String controlesText = "- MOVERSE: Usa las FLECHAS del teclado para caminar por el mapa.\n" +
+                "- INTERACTUAR: Presiona Z o ENTER para hablar con personas o recoger objetos.\n" +
+                "- MENÚ/ATRÁS: Presiona X o ESCAPE para abrir el menú de pausa o volver atrás.\n" +
+                "- SCROLL DE AYUDA: En esta pantalla, usa las FLECHAS ARRIBA/ABAJO para leer todo.";
         Label controlesLabel = new Label(controlesText, textStyle);
-        contentTable.add(controlesLabel).padBottom(20).left().row();
+        controlesLabel.setWrap(true);
+        contentTable.add(controlesLabel).width(textWidth).padBottom(20).left().row();
 
-        // OBJETIVO
-        Label objetivoHeader = new Label("OBJETIVO:", headerStyle);
-        contentTable.add(objetivoHeader).padBottom(10).left().row();
+        // 3. EXPLORACIÓN Y OBJETIVOS
+        contentTable.add(new Label("EXPLORACIÓN Y OBJETIVOS:", headerStyle)).padBottom(10).left().row();
+        String exploracionText = "1. BUSCA OBJETOS: Camina sobre flores o arbustos para encontrar ítems útiles.\n" +
+                "2. ENCUENTROS SALVAJES: Al caminar por zonas con flores, pueden aparecer Pokémon salvajes por sorpresa.\n"
+                +
+                "3. EL SANTUARIO: Tu objetivo final es llegar al Santuario de Arceus (marcado en el mapa) cuando seas lo suficientemente fuerte.";
+        Label exploracionLabel = new Label(exploracionText, textStyle);
+        exploracionLabel.setWrap(true);
+        contentTable.add(exploracionLabel).width(textWidth).padBottom(20).left().row();
 
-        String objetivoText = "- Explora el mundo y encuentra Pokémon salvajes.\n" +
-                "- Lucha contra ellos para debilitarlos y capturarlos.\n" +
-                "- ¡Ten cuidado! Si tus Pokémon se debilitan, perderás objetos.\n" +
-                "- Tu misión final es encontrar y desafiar al legendario Arceus.";
-        Label objetivoLabel = new Label(objetivoText, textStyle);
-        objetivoLabel.setWrap(true);
-        objetivoLabel.setAlignment(Align.topLeft);
-        contentTable.add(objetivoLabel).width(Proyecto.PANTALLA_W * 0.75f).padBottom(20).left().row();
-
-        // BATALLA
-        Label batallaHeader = new Label("BATALLA:", headerStyle);
-        contentTable.add(batallaHeader).padBottom(10).left().row();
-
-        String batallaText = "- Cada tipo de Pokémon tiene sus propias fortalezas y debilidades.\n" +
-                "- ¡Captura tantos como puedas para completar tu investigación!";
+        // 4. EL ARTE DEL COMBATE
+        contentTable.add(new Label("EL SISTEMA DE COMBATE:", headerStyle)).padBottom(10).left().row();
+        String batallaText = "Las batallas se juegan por turnos. En tu turno puedes:\n" +
+                "- LUCHAR: Elige un ataque para reducir la vida (HP) del oponente.\n" +
+                "- BOLSA: Usa objetos para curar a tu Pokémon o lanzar Pokéballs para capturar al rival.\n" +
+                "- POKÉMON: Cambia a otro miembro de tu equipo.\n" +
+                "- HUIR: Intenta escapar de una batalla salvaje (solo contra Pokémon salvajes).";
         Label batallaLabel = new Label(batallaText, textStyle);
         batallaLabel.setWrap(true);
-        batallaLabel.setAlignment(Align.topLeft);
-        contentTable.add(batallaLabel).width(Proyecto.PANTALLA_W * 0.75f).padBottom(20).left().row();
+        contentTable.add(batallaLabel).width(textWidth).padBottom(20).left().row();
 
-        ScrollPane scrollPane = new ScrollPane(contentTable);
-        mainTable.add(scrollPane).grow().width(Proyecto.PANTALLA_W * 0.8f).padBottom(20).row();
+        // 5. TIPOS Y ESTRATEGIA
+        contentTable.add(new Label("TIPOS Y ESTRATEGIA:", headerStyle)).padBottom(10).left().row();
+        String tiposText = "Cada Pokémon tiene 'Tipos' (Fuego, Agua, Planta, etc.).\n" +
+                "- El Fuego vence a la Planta.\n" +
+                "- El Agua vence al Fuego.\n" +
+                "- Planta vence al Agua.\n" +
+                "¡Usa ataques que sean efectivos contra el tipo del rival para hacer DOBLE de daño!";
+        Label tiposLabel = new Label(tiposText, textStyle);
+        tiposLabel.setWrap(true);
+        contentTable.add(tiposLabel).width(textWidth).padBottom(20).left().row();
+
+        // 6. ENTRENADORES Y NPCs
+        contentTable.add(new Label("ENTRENADORES (NPCs):", headerStyle)).padBottom(10).left().row();
+        String npcText = "Encontrarás personas en el mundo. Algunos te darán consejos, pero otros te retarán a un combate.\n"
+                +
+                "- Los combates contra entrenadores son más difíciles. No puedes huir de ellos.\n" +
+                "- Una vez que vences a un entrenador, no volverá a pelear contigo.";
+        Label npcLabel = new Label(npcText, textStyle);
+        npcLabel.setWrap(true);
+        contentTable.add(npcLabel).width(textWidth).padBottom(20).left().row();
+
+        // 7. CRECIMIENTO (NIVELES)
+        contentTable.add(new Label("SUBIR DE NIVEL:", headerStyle)).padBottom(10).left().row();
+        String nivelText = "- Ganar combates aumenta el nivel de tu Pokémon, mejorando su daño y vida.\n" +
+                "- El nivel máximo es 10. ¡Un Pokémon nivel 10 es un 'Pokémon Superior'!\n" +
+                "- Capturar a un Pokémon que ya tienes también le da un gran empuje de nivel.";
+        Label nivelLabel = new Label(nivelText, textStyle);
+        nivelLabel.setWrap(true);
+        contentTable.add(nivelLabel).width(textWidth).padBottom(40).left().row();
+
+        this.scrollPane = new ScrollPane(contentTable);
+        scrollPane.setFadeScrollBars(false);
+        mainTable.add(scrollPane).grow().width(Proyecto.PANTALLA_W * 0.85f).padBottom(20).row();
 
         // Back Button
-        TextButton backButton = new TextButton("VOLVER", btnStyle);
+        TextButton backButton = new TextButton("VOLVER (ESC)", btnStyle);
         backButton.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -153,6 +203,15 @@ public class ScreenAyuda implements Screen, InputProcessor {
 
     @Override
     public boolean keyDown(int keycode) {
+        if (keycode == Keys.UP || keycode == Keys.DOWN) {
+            float scrollAmount = 50f;
+            if (keycode == Keys.UP) {
+                scrollPane.setScrollY(scrollPane.getScrollY() - scrollAmount);
+            } else {
+                scrollPane.setScrollY(scrollPane.getScrollY() + scrollAmount);
+            }
+            return true;
+        }
         if (keycode == Keys.ESCAPE || keycode == Keys.ENTER || keycode == Keys.Z || keycode == Keys.X) {
             goBack();
             return true;
@@ -233,6 +292,8 @@ public class ScreenAyuda implements Screen, InputProcessor {
             stage.dispose();
         if (backgroundTexture != null)
             backgroundTexture.dispose();
+        if (shadowTexture != null)
+            shadowTexture.dispose();
         if (fontTitle != null)
             fontTitle.dispose();
         if (fontText != null)

@@ -19,7 +19,12 @@ public class Objeto {
         OTRO
     }
 
+    // UNIDAD 1 & 2: COMPOSICIÓN Y CLASES INTERNAS
+    // Un objeto 'Objeto' tiene una 'Recipe' (Receta). Esto demuestra la relación
+    // "tiene un".
     // --- CLASE ANIDADA PARA RECETAS ---
+    // UNIDAD 1: CLASE INTERNA (Inner Class)
+    // Una clase definida dentro de otra para agrupar lógica relacionada.
     public static class Recipe {
         private final int itemId; // ID del objeto resultante
         private final int quantity; // Cantidad resultante
@@ -110,10 +115,10 @@ public class Objeto {
         register(new Objeto(103, "Poción", Type.MEDICINA, "spritesObj/pocionS.png", "Restaura 20 PS de un Pokémon."));
         register(new Objeto(104, "Superpoción", Type.MEDICINA, "spritesObj/superpS.png",
                 "Restaura 50 PS de un Pokémon. Más efectiva que una Poción."));
-        register(new Objeto(105, "Revivir", Type.MEDICINA, "spritesObj/revS.png",
-                "Revive a un Pokémon con la mitad de sus PS máximos."));
-        register(new Objeto(106, "Revivir Máximo", Type.MEDICINA, "spritesObj/revMaxS.png",
-                "Revive a un Pokémon restaurando todos sus PS al máximo."));
+        register(new Objeto(105, "Piedra Potenciadora", Type.OTRO, "spritesObj/piedraPotenciadora.png",
+                "Aumenta un 50% el daño que hace el pokemón del jugador en una batalla."));
+        register(new Objeto(106, "MasterBall", Type.POKEBALL, "spritesObj/masterBall.png",
+                "Captura el 100% de las veces, siempre y cuando el pokemón rival esté a la mitad de vida o menos."));
 
         // 3. Definición de Recetas
 
@@ -134,17 +139,21 @@ public class Objeto {
         superpotionIngredients.put(4, 1);
         registerRecipe(new Recipe(104, 1, superpotionIngredients));
 
-        // Receta de Revivir: 1 Hierba Regia (5) + 1 Guijarro Rojo (2)
-        Map<Integer, Integer> reviveIngredients = new HashMap<>();
-        reviveIngredients.put(5, 1);
-        reviveIngredients.put(2, 1);
-        registerRecipe(new Recipe(105, 1, reviveIngredients));
+        // Receta de Piedra Potenciadora: 2 Guijarro Rojo (2) + 1 Hierba Regia (5) + 2
+        // Baya Aranja (4)
+        Map<Integer, Integer> boostIngredients = new HashMap<>();
+        boostIngredients.put(2, 2);
+        boostIngredients.put(5, 1);
+        boostIngredients.put(4, 2);
+        registerRecipe(new Recipe(105, 1, boostIngredients));
 
-        // Receta de Revivir Máximo: 3 Hierba Regia (5) + 2 Guijarro Rojo (2)
-        Map<Integer, Integer> maxReviveIngredients = new HashMap<>();
-        maxReviveIngredients.put(5, 3);
-        maxReviveIngredients.put(2, 2);
-        registerRecipe(new Recipe(106, 1, maxReviveIngredients));
+        // Receta de MasterBall: 2 Guijarro Rojo (2) + 2 Hierba Regia (5) + 1 Pokeball
+        // (101)
+        Map<Integer, Integer> masterballIngredients = new HashMap<>();
+        masterballIngredients.put(2, 2);
+        masterballIngredients.put(5, 2);
+        masterballIngredients.put(101, 1);
+        registerRecipe(new Recipe(106, 1, masterballIngredients));
     }
 
     private static void register(Objeto objeto) {

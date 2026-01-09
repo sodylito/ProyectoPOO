@@ -31,6 +31,7 @@ public class ScreenAcercaDe implements Screen, InputProcessor {
     private BitmapFont fontTitle;
     private BitmapFont fontText;
     private BitmapFont fontCredits;
+    private Texture shadowTexture;
 
     public ScreenAcercaDe(Proyecto game) {
         this.game = game;
@@ -46,41 +47,49 @@ public class ScreenAcercaDe implements Screen, InputProcessor {
         Gdx.input.setInputProcessor(multiplexer);
 
         // Background
-        backgroundTexture = new Texture(Gdx.files.internal("imagenes/fondoAyuda.png"));
+        backgroundTexture = new Texture(Gdx.files.internal("imagenes/pantallaCarga.jpg"));
         Image bgImage = new Image(backgroundTexture);
         bgImage.setFillParent(true);
         stage.addActor(bgImage);
+
+        // Shadow Overlay for contrast
+        com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1,
+                com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        pixmap.setColor(new Color(0, 0, 0, 0.6f));
+        pixmap.fill();
+        shadowTexture = new Texture(pixmap);
+        pixmap.dispose();
+        Image shadowOverlay = new Image(shadowTexture);
+        shadowOverlay.setFillParent(true);
+        stage.addActor(shadowOverlay);
 
         // Fonts
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("Mapa/ari-w9500-bold.ttf"));
 
         FreeTypeFontParameter titleParam = new FreeTypeFontParameter();
         titleParam.size = 50;
-        titleParam.color = Color.YELLOW;
-        titleParam.borderColor = Color.BLACK;
-        titleParam.borderWidth = 3;
+        titleParam.color = Color.RED;
+        titleParam.borderWidth = 0;
         fontTitle = generator.generateFont(titleParam);
 
         FreeTypeFontParameter textParam = new FreeTypeFontParameter();
         textParam.size = 28;
-        textParam.color = new Color(0.1f, 0.1f, 0.4f, 1f); // Azul oscuro
-        textParam.shadowColor = Color.GRAY;
-        textParam.shadowOffsetX = 2;
-        textParam.shadowOffsetY = 2;
+        textParam.color = Color.WHITE;
+        textParam.borderColor = Color.BLACK;
+        textParam.borderWidth = 1.2f;
         fontText = generator.generateFont(textParam);
 
         FreeTypeFontParameter creditsParam = new FreeTypeFontParameter();
         creditsParam.size = 24;
-        creditsParam.color = new Color(0.2f, 0.2f, 0.6f, 1f); // Azul un poco más claro pero legible
-        creditsParam.shadowColor = Color.GRAY;
-        creditsParam.shadowOffsetX = 1;
-        creditsParam.shadowOffsetY = 1;
+        creditsParam.color = Color.WHITE;
+        creditsParam.borderColor = Color.BLACK;
+        creditsParam.borderWidth = 1f;
         fontCredits = generator.generateFont(creditsParam);
 
         generator.dispose();
 
         // Styles
-        LabelStyle titleStyle = new LabelStyle(fontTitle, Color.YELLOW);
+        LabelStyle titleStyle = new LabelStyle(fontTitle, Color.RED);
         LabelStyle textStyle = new LabelStyle(fontText, Color.WHITE);
         LabelStyle creditsStyle = new LabelStyle(fontCredits, Color.WHITE);
 
@@ -88,7 +97,7 @@ public class ScreenAcercaDe implements Screen, InputProcessor {
         btnStyle.font = fontText;
         // Modificado para aspecto "seleccionado"
         btnStyle.fontColor = Color.YELLOW; // Botón "Volver" amarillo
-        btnStyle.downFontColor = Color.ORANGE;
+        btnStyle.downFontColor = Color.RED;
         btnStyle.overFontColor = Color.YELLOW;
 
         // Content Table
@@ -221,6 +230,8 @@ public class ScreenAcercaDe implements Screen, InputProcessor {
             stage.dispose();
         if (backgroundTexture != null)
             backgroundTexture.dispose();
+        if (shadowTexture != null)
+            shadowTexture.dispose();
         if (fontTitle != null)
             fontTitle.dispose();
         if (fontText != null)

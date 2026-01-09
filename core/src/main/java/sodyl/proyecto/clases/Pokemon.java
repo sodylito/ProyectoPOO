@@ -1,31 +1,45 @@
 package sodyl.proyecto.clases;
 
+// UNIDAD 1 & 2: Definición de CLASE y ABSTRACCIÓN
+// Esta clase representa la abstracción de un Pokémon en el juego.
+// Aquí definimos los atributos (características) y métodos (comportamientos).
 public class Pokemon {
 
+    // UNIDAD 2: ENCAPSULAMIENTO
+    // Usamos el modificador 'private' para proteger los datos de la clase.
+    // Esto asegura que el estado interno solo sea modificado a través de métodos
+    // controlados (Setters/Getters).
     private String especie;
     private TiposPokemon tipo;
-    private int baseHP; // este HP es el que tiene cada pokemón al capturarlo
-    private int growthHP; // Crecimiento de HP por nivel
-    private TiposAtaque movimiento1; // igual que el HP, pero con el daño base que hace el movimiento
+    private int baseHP; // Atributo: HP base al capturarlo
+    private int growthHP; // Atributo: Crecimiento por nivel
+    private TiposAtaque movimiento1;
     private TiposAtaque movimiento2;
 
     private int nivel;
     private int actualHP;
 
-    private int maxHp; // este es el HP total del pokemón, despues de sumarle el nivel
-    private int danoAtaque; // este es el daño total
+    private int maxHp;
+    private int danoAtaque;
     private int danoDefensa;
-    private int velocidad; // nueva: determina orden de turno
+    private int velocidad;
 
-    private int ppM1; // puntos de poder
+    private int ppM1;
     private int ppM2;
 
     private String spriteFront;
     private String spriteBack;
 
+    // UNIDAD 1: CONSTRUCTOR POR DEFECTO
+    // Permite instanciar un objeto sin valores iniciales (útil para serialización).
     public Pokemon() {
     }
 
+    // UNIDAD 1: CONSTRUCTOR PARAMETRIZADO
+    // Permite inicializar el objeto con valores específicos al momento de su
+    // creación.
+    // Usamos 'this' para diferenciar los atributos de la clase de los parámetros
+    // del constructor.
     public Pokemon(String especie, TiposPokemon tipo, int baseHP, int growthHP, TiposAtaque movimiento1,
             TiposAtaque movimiento2) {
         this.especie = especie;
@@ -36,6 +50,7 @@ public class Pokemon {
         this.movimiento2 = movimiento2;
         this.nivel = 1;
 
+        // Lógica de inicialización: Cálculo de atributos basados en el nivel
         this.maxHp = baseHP + (nivel * growthHP);
         this.danoAtaque = movimiento1.danoBase + (nivel * 2);
         this.danoDefensa = movimiento2.danoBase + (nivel * 2);
@@ -47,14 +62,16 @@ public class Pokemon {
         this.ppM2 = movimiento2.PP;
     }
 
-    public void actualizarAtributos() { // esto lo creé porque no voy a usar el constructor otra vez, cada vez que se
-                                        // haga un cambio en los atributos, se usará
-        this.maxHp = this.baseHP + (this.nivel * this.growthHP);
-        this.danoAtaque = this.movimiento1.danoBase + (this.nivel * 2);
-        this.danoDefensa = this.movimiento2.danoBase + (this.nivel * 2);
-        this.velocidad = 10 + (this.nivel * 2);
+    public void actualizarAtributos() {
+        int effectiveLevel = Math.max(1, this.nivel);
+        this.maxHp = this.baseHP + (effectiveLevel * this.growthHP);
+        this.danoAtaque = this.movimiento1.danoBase + (effectiveLevel * 2);
+        this.danoDefensa = this.movimiento2.danoBase + (effectiveLevel * 2);
+        this.velocidad = 10 + (effectiveLevel * 2);
     }
 
+    // UNIDAD 2: GETTERS Y SETTERS
+    // Métodos públicos para acceder y modificar atributos privados de forma segura.
     public String getSpriteFront() {
         return spriteFront;
     }
@@ -99,8 +116,9 @@ public class Pokemon {
         return nivel;
     }
 
+    // Ejemplo de validación en un Setter (Encapsulamiento avanzado)
     public void setNivel(int nivel) {
-        this.nivel = nivel;
+        this.nivel = Math.max(0, Math.min(10, nivel));
     }
 
     public int getActualHP() {
@@ -175,7 +193,10 @@ public class Pokemon {
         return false;
     }
 
-    /** Usar PP de un movimiento por número (1 o 2). */
+    /**
+     * UNIDAD 1: PASE DE MENSAJES
+     * Este método interactúa con otros métodos internos para realizar una acción.
+     */
     public boolean usarPPMovimiento(int movimientoNumero) {
         if (movimientoNumero == 1)
             return usarppM1();

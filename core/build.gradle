@@ -32,3 +32,9 @@ dependencies {
     implementation "io.github.berstanio:gdx-svmhelper-annotations:$graalHelperVersion"
   }
 }
+
+task runServer(type: JavaExec) {
+    mainClass = 'sodyl.proyecto.networking.ServidorPokemon'
+    classpath = sourceSets.main.runtimeClasspath
+    standardInput = System.in
+}

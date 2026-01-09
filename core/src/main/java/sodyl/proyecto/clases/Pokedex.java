@@ -14,12 +14,18 @@ import com.badlogic.gdx.utils.Json;
 import com.badlogic.gdx.utils.JsonWriter;
 
 /**
- * Simple Pokedex manager: registra Pokémon vistos/desbloqueados por el jugador.
- * Implementación mínima para soportar añadir desde la pantalla de selección.
+ * UNIDAD 1, 2 & 10: GESTIÓN DE ESTADO GLOBAL Y COLECCIONES
+ * Esta clase utiliza miembros 'static' para mantener la información de la
+ * Pokedex
+ * compartida en toda la aplicación (Pseudo-Singleton).
  */
 public class Pokedex {
+    // UNIDAD 10: Diferentes tipos de colecciones para diferentes propósitos:
+    // Set (HashSet): Evita duplicados automáticos (especies vistas).
     private static final Set<String> seen = new HashSet<>();
+    // List (ArrayList): Mantiene un orden de inserción (Pokémon capturados).
     private static final List<Pokemon> collected = new ArrayList<>();
+    // Map (HashMap): Relaciona una especie con su nivel de investigación.
     private static final Map<String, Integer> researchLevels = new HashMap<>();
 
     // Helper to get the save file path for the current user
@@ -31,6 +37,12 @@ public class Pokedex {
     }
 
     private static boolean tutorialCompleted = false;
+
+    public static boolean exists(String username) {
+        if (username == null)
+            return false;
+        return Gdx.files.local(username + "_pokedex.json").exists();
+    }
 
     // Team Management
     private static final List<Pokemon> team = new ArrayList<>();
@@ -68,12 +80,14 @@ public class Pokedex {
 
         if (alreadyHasSpecies) {
             // Subsequent capture: add +2 to current level (max 10)
+            existingPokemon.setNivel(existingPokemon.getNivel() + 2);
+            existingPokemon.actualizarAtributos();
             addResearchPoints(pokemon.getEspecie(), 2);
-            Gdx.app.log("POKEDEX", "Duplicate species caught: " + pokemon.getEspecie() + ". Research level increased.");
+            Gdx.app.log("POKEDEX", "Duplicate species caught: " + pokemon.getEspecie() + ". Level increased by 2.");
             return; // Do not add to collection
         }
 
-        // First capture: set level to 2
+        // First capture: set level to 2 (0 base + 2 capture)
         pokemon.setNivel(2);
         pokemon.actualizarAtributos();
         researchLevels.put(pokemon.getEspecie(), 2);
@@ -100,16 +114,9 @@ public class Pokedex {
         if (current >= 10)
             return;
 
-        int nuevoNivel = Math.min(10, current + points);
-        researchLevels.put(especie, nuevoNivel);
-        addSeen(especie);
-
-        for (Pokemon p : collected) {
-            if (p.getEspecie().equals(especie)) {
-                p.setNivel(nuevoNivel);
-                p.actualizarAtributos();
-            }
-        }
+        int nuevoNivelDesbloqueado = Math.min(10, current + points);
+        researchLevels.put(especie, nuevoNivelDesbloqueado);
+        // We no longer sync all instances level here. Levels are instance-based.
         save();
     }
 
@@ -182,53 +189,68 @@ public class Pokedex {
     }
 
     public static void save() {
-        // PERMANENCE DISABLED BY USER
-        // Json json = new Json();
-        // json.setOutputType(JsonWriter.OutputType.json);
-        // PokedexData data = new PokedexData();
-        // data.seen = seen;
-        // data.collected = collected;
-        // data.researchLevels = researchLevels;
-        // data.team = team;
-        // data.tutorialCompleted = tutorialCompleted;
+        String user = UserManager.getCurrentUser();
+        if (user == null)
+            return;
 
-        // FileHandle file = Gdx.files.local(getSaveFileName());
-        // file.writeString(json.toJson(data), false);
-        Gdx.app.log("POKEDEX", "Save disabled (Session only)");
+        Json json = new Json();
+        json.setOutputType(JsonWriter.OutputType.json);
+        PokedexData data = new PokedexData();
+        data.seen = seen;
+        data.collected = collected;
+        data.researchLevels = researchLevels;
+        data.team = team;
+        data.tutorialCompleted = tutorialCompleted;
+
+        FileHandle file = Gdx.files.local(getSaveFileName());
+        file.writeString(json.prettyPrint(data), false);
+        Gdx.app.log("POKEDEX", "Progress saved for user: " + user);
     }
 
     public static void load() {
-        // PERMANENCE DISABLED BY USER
-        // FileHandle file = Gdx.files.local(getSaveFileName());
-        // if (!file.exists())
-        // return;
+        String user = UserManager.getCurrentUser();
+        if (user == null)
+            return;
 
-        // try {
-        // Json json = new Json();
-        // PokedexData data = json.fromJson(PokedexData.class, file.readString());
-        // if (data != null) {
-        // seen.clear();
-        // if (data.seen != null)
-        // seen.addAll(data.seen);
+        FileHandle file = Gdx.files.local(getSaveFileName());
+        if (!file.exists()) {
+            Gdx.app.log("POKEDEX", "No save file found for user: " + user);
+            return;
+        }
 
-        // collected.clear();
-        // if (data.collected != null)
-        // collected.addAll(data.collected);
+        // UNIDAD 6: MANEJO DE EXCEPCIONES
+        // El bloque try-catch permite gestionar errores en tiempo de ejecución (como un
+        // archivo corrupto)
+        // sin que la aplicación se cierre inesperadamente (Crash).
+        try {
+            Json json = new Json();
+            // Deserialización: Convertir texto JSON de vuelta a objetos Java.
+            PokedexData data = json.fromJson(PokedexData.class, file.readString());
+            if (data != null) {
+                seen.clear();
+                if (data.seen != null)
+                    seen.addAll(data.seen);
 
-        // researchLevels.clear();
-        // if (data.researchLevels != null)
-        // researchLevels.putAll(data.researchLevels);
+                collected.clear();
+                if (data.collected != null)
+                    collected.addAll(data.collected);
 
-        // team.clear();
-        // if (data.team != null)
-        // team.addAll(data.team);
+                researchLevels.clear();
+                if (data.researchLevels != null)
+                    researchLevels.putAll(data.researchLevels);
 
-        // tutorialCompleted = data.tutorialCompleted;
-        // }
-        // } catch (Exception e) {
-        // e.printStackTrace();
-        // }
-        Gdx.app.log("POKEDEX", "Load disabled (Starting fresh session)");
+                team.clear();
+                if (data.team != null)
+                    team.addAll(data.team);
+
+                tutorialCompleted = data.tutorialCompleted;
+                Gdx.app.log("POKEDEX", "Progress loaded for user: " + user);
+            }
+        } catch (Exception e) {
+            // UNIDAD 6: CAPTURA Y GESTIÓN
+            // Informamos del error en el log en lugar de detener el programa.
+            Gdx.app.error("POKEDEX", "Error loading pokedex", e);
+        }
     }
 
     public static boolean isTutorialCompleted() {

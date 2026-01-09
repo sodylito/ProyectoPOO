@@ -4,10 +4,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Pokemones {
-        // hashMap es una colecciòn. Se usa esto y no un ArrayList porque esta
-        // estructura relaciona a una clave (el nombre del pokemòn)
-        // con un valor (el pokemòn, como tipo). Esto es mucho màs eficiente que
-        // recorrer el arreglo
+
+        // UNIDAD 10: COLECCIONES (Collections)
+        // HashMap es una estructura de datos que asocia una clave única con un valor.
+        // Se usa aquí por su alta eficiencia (O(1)) para buscar un Pokémon por su
+        // nombre,
+        // evitando tener que recorrer una lista completa (como en un ArrayList).
         private static final Map<String, Pokemon> misPokemones = new HashMap<>();
         private static final Map<String, TiposAtaque> misAtaques = new HashMap<>();
 
@@ -169,13 +171,18 @@ public class Pokemones {
                 misPokemones.put("Arceus", arceus);
         }
 
-        // esta funciòn es para crear el pokemòn en el encuentro/captura
+        // UNIDAD 9: PATRONES DE DISEÑO - PROTOTYPE / FACTORY
+        // Este método actúa como una fábrica de objetos que utiliza el patrón
+        // Prototype.
+        // En lugar de crear un objeto desde cero, buscamos una "plantilla" (template)
+        // y creamos una copia (instancia nueva) con los mismos valores base.
         public static Pokemon getPokemon(String nombre) {
                 Pokemon plantilla = misPokemones.get(nombre);
                 if (plantilla == null) {
                         return null;
                 }
 
+                // Creamos una nueva instancia basada en la plantilla (Clonación lógica)
                 Pokemon newPokemon = new Pokemon(plantilla.getEspecie(), plantilla.getTipo(), plantilla.getBaseHP(),
                                 plantilla.getGrowthHP(), plantilla.getMovimiento1(), plantilla.getMovimiento2());
                 newPokemon.setSpriteFront(plantilla.getSpriteFront());
@@ -183,6 +190,10 @@ public class Pokemones {
                 newPokemon.actualizarAtributos();
 
                 return newPokemon;
+        }
+
+        public static java.util.List<TiposAtaque> getAllAttacks() {
+                return new java.util.ArrayList<>(misAtaques.values());
         }
 
         public static java.util.List<String> getAllSpecies() {

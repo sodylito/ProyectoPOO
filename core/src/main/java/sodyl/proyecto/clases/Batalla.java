@@ -5,6 +5,12 @@ import java.util.Random;
 /**
  * Clase que maneja la lógica de batalla entre Pokémon.
  */
+// UNIDAD 2: COHESIÓN Y ACOPLAMIENTO
+// Esta clase presenta una ALTA COHESIÓN porque se encarga únicamente de la
+// lógica de combate.
+// El acoplamiento se mantiene controlado al recibir las dependencias (Pokemon,
+// Inventario)
+// por constructor, facilitando la mantenibilidad.
 public class Batalla {
     private Pokemon pokemonJugador;
     private Pokemon pokemonEnemigo;
@@ -13,6 +19,8 @@ public class Batalla {
     private boolean batallaTerminada;
     private String ganador; // "JUGADOR" o "ENEMIGO"
 
+    private float playerDamageMultiplier = 1.0f;
+
     public Batalla(Pokemon pokemonJugador, Pokemon pokemonEnemigo, Inventario inventario) {
         this.pokemonJugador = pokemonJugador;
         this.pokemonEnemigo = pokemonEnemigo;
@@ -20,6 +28,10 @@ public class Batalla {
         this.random = new Random();
         this.batallaTerminada = false;
         this.ganador = null;
+    }
+
+    public void activatePowerUp() {
+        this.playerDamageMultiplier = 1.5f;
     }
 
     /**
@@ -62,6 +74,13 @@ public class Batalla {
      * @param defensor         Pokemon que defiende
      * @param movimientoNumero 1 o 2
      * @return Mensaje del resultado
+     */
+    /**
+     * UNIDAD 1: PASE DE MENSAJES (Messaging)
+     * En POO, los "mensajes" son llamadas a métodos. Aquí 'Batalla' envía un
+     * mensaje
+     * al objeto 'atacante' (usarPPMovimiento) y luego delega la ejecución al método
+     * interno.
      */
     public String executeAttack(Pokemon atacante, Pokemon defensor, int movimientoNumero) {
         if (batallaTerminada)
@@ -182,31 +201,51 @@ public class Batalla {
     }
 
     /**
-     * Intenta capturar al Pokémon enemigo usando una Pokéball.
+     * Intenta capturar al Pokémon enemigo usando un objeto de captura.
      * 
+     * @param itemId ID del objeto a usar (101 para Pokéball, 106 para MasterBall)
      * @return true si la captura fue exitosa, false en caso contrario
      */
-    public boolean intentarCaptura() {
+    public boolean intentarCaptura(int itemId) {
         // Permitir captura solo durante batalla activa (no terminada) y con Pokemon
         // vivo (HP > 0)
         if (!batallaTerminada && pokemonEnemigo.getActualHP() > 0) {
-            // Verificar si hay pokeballs (ID 101)
-            if (inventario.getQuantity(101) <= 0) {
+            // Verificar si hay el objeto solicitado
+            if (inventario.getQuantity(itemId) <= 0) {
                 return false;
             }
 
-            // Consumir pokeball
-            inventario.removeObjeto(101, 1);
+            // Consumir objeto
+            inventario.removeObjeto(itemId, 1);
 
-            // Fórmula simple de captura: más fácil si el HP es bajo
+            boolean capturado = false;
             float hpPorcentaje = (float) pokemonEnemigo.getActualHP() / pokemonEnemigo.getMaxHp();
-            float probabilidadCaptura = (1.0f - hpPorcentaje) * 0.5f; // Máximo 50% si HP = 0
+            boolean isArceus = pokemonEnemigo.getEspecie().equalsIgnoreCase("Arceus");
 
-            boolean capturado = random.nextFloat() < probabilidadCaptura;
-
-            if (capturado) {
-                Pokedex.addCollected(pokemonEnemigo);
-                Pokedex.addResearchPoints(pokemonEnemigo.getEspecie(), 2);
+            if (itemId == 106) {
+                // Lógica MasterBall
+                if (isArceus) {
+                    // Arceus: 100% si HP <= 25%
+                    if (hpPorcentaje <= 0.25f) {
+                        capturado = true;
+                    }
+                } else {
+                    // General: 100% si HP <= 75%
+                    if (hpPorcentaje <= 0.75f) {
+                        capturado = true;
+                    }
+                }
+            } else if (itemId == 101) {
+                // Pokéball normal
+                if (isArceus) {
+                    // A Arceus no se le puede capturar con una pokebola
+                    capturado = false;
+                } else {
+                    // Solo captura con 25% de vida o menos
+                    if (hpPorcentaje <= 0.25f) {
+                        capturado = true;
+                    }
+                }
             }
 
             return capturado;
@@ -238,6 +277,11 @@ public class Batalla {
         // Daño = (Poder_Ataque * (Nivel_Pokemon + 5)) / 10
         int danoBaseCalculado = (poder * (nivel + 5)) / 10;
 
+        // Aplicar potenciador si es el jugador el que ataca
+        if (atacante == pokemonJugador) {
+            danoBaseCalculado = (int) (danoBaseCalculado * playerDamageMultiplier);
+        }
+
         // Type effectiveness
         double efectividad = TablaEficacia.getMultiplicador(movimiento.tipo, defensor.getTipo());
 
@@ -267,13 +311,7 @@ public class Batalla {
             salida.append("\n¡").append(defensor.getEspecie()).append(" se debilitó!");
 
             if (ganador.equals("JUGADOR")) {
-                // Ganar batalla: +1 nivel de investigación
-                Pokedex.addResearchPoints(defensor.getEspecie(), 1);
-
-                // Recompensa aleatoria
-                int rewardId = random.nextBoolean() ? 1 : 2; // 1: Bonguri, 2: Guijarro Rojo
-                inventario.addObjeto(rewardId, 1);
-                salida.append("\n¡Has obtenido una recompensa!");
+                // Battle results and rewards are now handled in ScreenBatalla.java
             }
         }
 

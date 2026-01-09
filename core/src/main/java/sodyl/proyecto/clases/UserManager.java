@@ -75,6 +75,10 @@ public class UserManager {
             return false;
         }
         String storedPassword = users.get(username);
-        return storedPassword.equals(password);
+        if (storedPassword.equals(password)) {
+            setCurrentUser(username);
+            return true;
+        }
+        return false;
     }
 }

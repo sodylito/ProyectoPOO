@@ -22,6 +22,7 @@ public class DialogBox {
     private String fullText;
     private int currentVisibleChars;
     private Texture backgroundTexture;
+    private Color currentBorderColor = Color.GREEN;
 
     // Velocidad de tipeo: caracteres por segundo
     private final float charsPerSecond = 30f;
@@ -178,7 +179,7 @@ public class DialogBox {
         }
 
         // 2. Recrear la textura de fondo con el nuevo ancho
-        this.backgroundTexture = createRoundedRectTexture(width, BOX_HEIGHT, Color.WHITE, Color.GREEN,
+        this.backgroundTexture = createRoundedRectTexture(width, BOX_HEIGHT, Color.WHITE, currentBorderColor,
                 BORDER_THICKNESS_HORIZONTAL, BORDER_THICKNESS_VERTICAL, CORNER_RADIUS);
         container.setBackground(new TextureRegionDrawable(backgroundTexture));
 
@@ -197,6 +198,30 @@ public class DialogBox {
     public void dispose() {
         if (backgroundTexture != null) {
             backgroundTexture.dispose();
+        }
+    }
+
+    /**
+     * Cambia el color del borde del diálogo y refresca el fondo.
+     * 
+     * @param color El nuevo color para el borde.
+     */
+    public void setBorderColor(Color color) {
+        if (color == null || color.equals(currentBorderColor))
+            return;
+
+        this.currentBorderColor = color;
+
+        // Si tenemos un contenedor y un stage, podemos regenerar la textura
+        if (container != null && container.getStage() != null) {
+            if (backgroundTexture != null) {
+                backgroundTexture.dispose();
+            }
+
+            float width = container.getStage().getWidth();
+            this.backgroundTexture = createRoundedRectTexture(width, BOX_HEIGHT, Color.WHITE, currentBorderColor,
+                    BORDER_THICKNESS_HORIZONTAL, BORDER_THICKNESS_VERTICAL, CORNER_RADIUS);
+            container.setBackground(new TextureRegionDrawable(backgroundTexture));
         }
     }
 

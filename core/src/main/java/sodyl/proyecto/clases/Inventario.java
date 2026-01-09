@@ -17,10 +17,24 @@ public class Inventario {
     // Límite máximo de unidades que se pueden tener de CADA objeto.
     public static final int MAX_QUANTITY = 99;
 
+    // UNIDAD 10: COLECCIONES GENÉRICAS
+    // Map<Integer, Integer> utiliza Generics para asegurar que las claves y valores
+    // sean siempre números enteros, evitando errores de tipo en tiempo de
+    // ejecución.
     private final Map<Integer, Integer> objetos; // ID del Objeto -> Cantidad
 
     public Inventario() {
         this.objetos = new HashMap<>();
+    }
+
+    public static boolean exists(String username) {
+        if (username == null)
+            return false;
+        return Gdx.files.local(username + "_inventory.json").exists();
+    }
+
+    public void clear() {
+        objetos.clear();
     }
 
     /**
@@ -76,6 +90,11 @@ public class Inventario {
      */
     public boolean craftItem(Recipe recipe) {
         // 1. Verificar si tiene todos los ingredientes
+        // UNIDAD 2: LEY DE DEMETER (Mínimo Conocimiento)
+        // En lugar de acceder a los datos internos de 'recipe' directamente,
+        // usamos sus métodos (getIngredients). Esto reduce el acoplamiento:
+        // 'Inventario' no necesita saber CÓMO se guardan los ingredientes dentro de
+        // 'recipe'.
         for (Map.Entry<Integer, Integer> entry : recipe.getIngredients().entrySet()) {
             int ingredientId = entry.getKey();
             int requiredQuantity = entry.getValue();
@@ -125,7 +144,7 @@ public class Inventario {
         file.writeString(json.toJson(objetos), false);
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void load(String username) {
         if (username == null)
             return;
@@ -133,10 +152,42 @@ public class Inventario {
         if (file.exists()) {
             try {
                 Json json = new Json();
-                Map<Integer, Integer> loaded = json.fromJson(HashMap.class, file.readString());
-                if (loaded != null) {
+                // We load as a raw Map first because LibGDX JSON might load keys as Strings
+                Map loadedRaw = json.fromJson(HashMap.class, file.readString());
+                if (loadedRaw != null) {
                     objetos.clear();
-                    objetos.putAll(loaded);
+                    for (Object key : loadedRaw.keySet()) {
+                        try {
+                            Integer id;
+                            if (key instanceof String) {
+                                id = Integer.parseInt((String) key);
+                            } else if (key instanceof Integer) {
+                                id = (Integer) key;
+                            } else if (key instanceof Float) {
+                                id = ((Float) key).intValue();
+                            } else {
+                                continue;
+                            }
+
+                            Object val = loadedRaw.get(key);
+                            Integer quantity;
+                            if (val instanceof Integer) {
+                                quantity = (Integer) val;
+                            } else if (val instanceof Float) {
+                                quantity = ((Float) val).intValue();
+                            } else if (val instanceof String) {
+                                quantity = Integer.parseInt((String) val);
+                            } else {
+                                continue;
+                            }
+
+                            objetos.put(id, quantity);
+                        } catch (Exception e) {
+                            Gdx.app.error("INVENTARIO", "Error parsing item: " + key, e);
+                        }
+                    }
+                    Gdx.app.log("INVENTARIO",
+                            "Inventory loaded for " + username + ": " + objetos.size() + " types of items.");
                 }
             } catch (Exception e) {
                 Gdx.app.error("INVENTARIO", "Error loading inventory", e);

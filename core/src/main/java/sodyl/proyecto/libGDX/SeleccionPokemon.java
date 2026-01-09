@@ -103,7 +103,7 @@ public class SeleccionPokemon implements Screen, InputProcessor {
             pokemonTextures.add(new Texture(Gdx.files.internal("imagenes/cyndaquil.png")));
             pokemonTextures.add(new Texture(Gdx.files.internal("imagenes/oshawott.png")));
         } catch (Exception e) {
-            Gdx.app.error("SELECTION", "Error loading Pokemon textures: " + e.getMessage());
+            Gdx.app.error("SELECCIÓN", "Error al cargar texturas de Pokémon: " + e.getMessage());
             // Add placeholders to avoid crash
             for (int i = 0; i < 3; i++) {
                 com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(150, 150,
@@ -190,7 +190,7 @@ public class SeleccionPokemon implements Screen, InputProcessor {
     private void updateSelectionUI() {
         String name = pokemonNames[selectedIndex];
         selectedNameLabel.setText(name);
-        Gdx.app.log("Selection", "Selected: " + name);
+        Gdx.app.log("Selección", "Seleccionado: " + name);
 
         // Visual indicator with animations
         for (int i = 0; i < selectionTable.getChildren().size; i++) {
@@ -280,21 +280,30 @@ public class SeleccionPokemon implements Screen, InputProcessor {
         }
         if (keycode == Keys.ENTER) {
             String selectedPokemonName = pokemonNames[selectedIndex];
-            Gdx.app.log("GAME START", "Starting game with " + selectedPokemonName);
+            Gdx.app.log("INICIO JUEGO", "Comenzando juego con " + selectedPokemonName);
 
-            // Registrar en la Pokedex
+            // Setup Inventory
+            Inventario inventory = (previousScreen != null) ? previousScreen.playerInventory : null;
+            if (inventory == null) {
+                inventory = new Inventario();
+            }
+            inventory.addObjeto(101, 5); // 5 Pokeballs
+
+            // Registrar en la Pokedex y Equipo
             try {
-                sodyl.proyecto.clases.Pokedex.addSeen(selectedPokemonName);
-            } catch (Exception ignored) {
+                sodyl.proyecto.clases.Pokemon starter = sodyl.proyecto.clases.Pokemones.getPokemon(selectedPokemonName);
+                if (starter != null) {
+                    starter.setNivel(0);
+                    starter.actualizarAtributos();
+                    starter.setActualHP(starter.getMaxHp());
+                    sodyl.proyecto.clases.Pokedex.addCollected(starter);
+                }
+            } catch (Exception e) {
+                Gdx.app.error("SELECCIÓN", "Error al registrar inicial", e);
             }
 
             // Transition back to Map 1
-            // Use the constructor that allows setting the state to FREE_ROAMING to avoid
-            // intro loop
-            // Preserve inventory if available
-            Inventario inventory = (previousScreen != null) ? previousScreen.playerInventory : null;
-
-            game.setScreen(new ScreenMapaTiled(game, "Mapa/mapa11.tmx", inventory, null, selectedPokemonName,
+            game.setScreen(new ScreenMapaTiled(game, "Mapa/MAPACOMPLETO.tmx", inventory, null, selectedPokemonName,
                     ScreenMapaTiled.GameState.FREE_ROAMING));
             return true;
         }

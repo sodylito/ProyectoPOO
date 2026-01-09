@@ -91,7 +91,7 @@ public class BackgroundScreen implements Screen, InputProcessor {
         style.fontColor = Color.WHITE;
 
         // Texto de los créditos
-        String creditText = "Desarrollado por:\nSodyl Abreu\nNicolas Brito\nDubraska Rodriguez";
+        String creditText = "";
         Label creditsLabel = new Label(creditText, style);
 
         // Establecer posición en la esquina inferior derecha
@@ -139,7 +139,7 @@ public class BackgroundScreen implements Screen, InputProcessor {
                 // Transición terminada, cambiar de pantalla
                 // CAMBIO CLAVE: Usar el nuevo constructor para saltar el fade-in en
                 // MenuPrincipal
-                game.setScreen(new MenuPrincipal(game, true));
+                game.setScreen(new ScreenLogin(game));
                 return;
             }
 
