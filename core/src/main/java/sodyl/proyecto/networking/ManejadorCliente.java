@@ -17,13 +17,19 @@ public class ManejadorCliente implements Runnable {
     public ManejadorCliente(Socket socket, Set<ManejadorCliente> clientes) {
         this.socket = socket;
         this.clientes = clientes;
+        try {
+            out = new PrintWriter(socket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        } catch (IOException e) {
+            System.err.println("Error inicializando flujos para un cliente: " + e.getMessage());
+        }
     }
 
     @Override
     public void run() {
+        if (in == null || out == null)
+            return;
         try {
-            out = new PrintWriter(socket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             String mensaje;
             while ((mensaje = in.readLine()) != null) {
@@ -39,7 +45,16 @@ public class ManejadorCliente implements Runnable {
                 e.printStackTrace();
             }
             clientes.remove(this);
+            ServidorPokemon.desconectarCliente(this);
         }
+    }
+
+    public void setIdCliente(String id) {
+        this.idCliente = id;
+    }
+
+    public String getIdCliente() {
+        return idCliente;
     }
 
     public void enviar(String mensaje) {

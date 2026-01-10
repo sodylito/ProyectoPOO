@@ -3,32 +3,25 @@ package sodyl.proyecto.clases;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.List;
 
-/**
- * Clase estática que define todos los objetos y recetas disponibles en el
- * juego.
- */
+//Clase que define todos los objetos y recetas disponibles en el juego
 public class Objeto {
 
-    // --- ENUMS ---
+    // Constantes a usar
     public enum Type {
-        MATERIAL, // Material base para craftear (ej. Bonguri)
-        POKEBALL, // Objeto de captura (ej. Pokeball)
-        MEDICINA, // Objeto de curación
+        MATERIAL,
+        POKEBALL,
+        MEDICINA,
         OTRO
     }
 
-    // UNIDAD 1 & 2: COMPOSICIÓN Y CLASES INTERNAS
-    // Un objeto 'Objeto' tiene una 'Recipe' (Receta). Esto demuestra la relación
-    // "tiene un".
-    // --- CLASE ANIDADA PARA RECETAS ---
-    // UNIDAD 1: CLASE INTERNA (Inner Class)
-    // Una clase definida dentro de otra para agrupar lógica relacionada.
+    // Clase interna que define la receta de un objeto, es necesario porque la
+    // receta
+    // es un objeto que se relaciona con el objeto
     public static class Recipe {
-        private final int itemId; // ID del objeto resultante
-        private final int quantity; // Cantidad resultante
-        private final Map<Integer, Integer> ingredients; // Ingredientes (ID -> Cantidad)
+        private final int itemId;
+        private final int quantity;
+        private final Map<Integer, Integer> ingredients;
 
         public Recipe(int itemId, int quantity, Map<Integer, Integer> ingredients) {
             this.itemId = itemId;
@@ -49,16 +42,16 @@ public class Objeto {
         }
     }
 
-    // --- CATÁLOGOS ESTÁTICOS ---
+    // CATÁLOGOS ESTÁTICOS
     private static final Map<Integer, Objeto> OBJETOS_CATALOG = new HashMap<>();
     private static final Map<Integer, Recipe> RECIPES_CATALOG = new HashMap<>();
 
-    // --- PROPIEDADES DE INSTANCIA ---
+    // --- PROPIEDADES DE INSTANCIA
     private final int id;
     private final String nombre;
     private final Type tipo;
-    private final String texturePath; // Ruta de la textura para Collectible
-    private final String description; // Descripción
+    private final String texturePath;
+    private final String description;
 
     public Objeto(int id, String nombre, Type tipo, String texturePath, String description) {
         this.id = id;

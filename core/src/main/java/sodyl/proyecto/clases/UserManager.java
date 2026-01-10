@@ -7,6 +7,7 @@ import com.badlogic.gdx.utils.JsonWriter.OutputType;
 
 import java.util.HashMap;
 
+// CLASE PARA GESTIONAR USUARIOS
 public class UserManager {
     private static final String USERS_FILE = "users.json";
     private HashMap<String, String> users;
@@ -28,24 +29,22 @@ public class UserManager {
         loadUsers();
     }
 
+    // CARGAR USUARIOS
     @SuppressWarnings("unchecked")
     private void loadUsers() {
         FileHandle file = Gdx.files.local(USERS_FILE);
         if (file.exists()) {
-            try {
-                users = json.fromJson(HashMap.class, file);
-            } catch (Exception e) {
-                Gdx.app.error("UserManager", "Error loading users", e);
-                users = new HashMap<>();
-            }
+            users = json.fromJson(HashMap.class, file);
         }
     }
 
+    // GUARDAR USUARIOS
     private void saveUsers() {
         FileHandle file = Gdx.files.local(USERS_FILE);
         file.writeString(json.prettyPrint(users), false);
     }
 
+    // REGISTRAR USUARIO (colocar validaciones)
     public String register(String username, String password) {
         if (username == null || username.trim().isEmpty()) {
             return "El usuario no puede estar vacío.";
@@ -67,7 +66,7 @@ public class UserManager {
         }
         users.put(username, password);
         saveUsers();
-        return "SUCCESS";
+        return "ÉXITO";
     }
 
     public boolean login(String username, String password) {

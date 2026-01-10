@@ -39,6 +39,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
 
     @Override
     public void show() {
+        game.playMusic("musica/jumpUp.mp3");
         stage = new Stage(new FitViewport(Proyecto.PANTALLA_W, Proyecto.PANTALLA_H));
 
         InputMultiplexer multiplexer = new InputMultiplexer();

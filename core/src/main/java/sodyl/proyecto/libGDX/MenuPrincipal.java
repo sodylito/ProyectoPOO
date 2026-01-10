@@ -28,450 +28,498 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import sodyl.proyecto.clases.UserManager;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
+import com.badlogic.gdx.scenes.scene2d.ui.TextField;
+import com.badlogic.gdx.scenes.scene2d.ui.TextField.TextFieldStyle;
 
 public class MenuPrincipal implements Screen, InputProcessor {
 
-    private final Proyecto game;
-    private Stage stage;
-    private BitmapFont font;
+    private final Proyecto juego;
+    private Stage escenario;
+    private BitmapFont fuente;
 
-    private Texture backgroundTexture;
-    private Image backgroundImage;
-    private Texture titleTexture;
-    private Image titleImage;
+    private Texture texturaFondo;
+    private Image imagenFondo;
+    private Texture texturaTitulo;
+    private Image imagenTitulo;
 
-    // --- TEXTURAS PARA LOS BOTONES PNG (DEBES TENERLAS EN assets/imagenes/) ---
-    private Texture newGameButtonTexture;
-    private Texture newGameButtonSelectedTexture;
-    private Texture continueGameButtonTexture;
-    private Texture continueGameButtonSelectedTexture;
-    private Texture optionsButtonTexture;
-    private Texture optionsButtonSelectedTexture;
-    private Texture exitButtonTexture;
-    private Texture exitButtonSelectedTexture;
-    private Texture helpButtonTexture;
-    private Texture helpButtonSelectedTexture;
-    private Texture aboutButtonTexture;
-    private Texture aboutButtonSelectedTexture;
-    private Texture backButtonTexture;
-    private Texture backButtonSelectedTexture;
-    private Texture singlePlayerButtonTexture;
-    private Texture singlePlayerButtonSelectedTexture;
-    private Texture multiPlayerButtonTexture;
-    private Texture multiPlayerButtonSelectedTexture;
+    // TEXTURAS PARA LOS BOTONES PNG
+    private Texture texturaBotonNuevaPartida;
+    private Texture texturaBotonNuevaPartidaSeleccionado;
+    private Texture texturaBotonContinuar;
+    private Texture texturaBotonContinuarSeleccionado;
+    private Texture texturaBotonOpciones;
+    private Texture texturaBotonOpcionesSeleccionado;
+    private Texture texturaBotonSalir;
+    private Texture texturaBotonSalirSeleccionado;
+    private Texture texturaBotonAyuda;
+    private Texture texturaBotonAyudaSeleccionado;
+    private Texture texturaBotonAcercaDe;
+    private Texture texturaBotonAcercaDeSeleccionado;
+    private Texture texturaBotonVolver;
+    private Texture texturaBotonVolverSeleccionado;
+    private Texture texturaBotonSolitario;
+    private Texture texturaBotonSolitarioSeleccionado;
+    private Texture texturaBotonMultijugador;
+    private Texture texturaBotonMultijugadorSeleccionado;
 
-    // Texturas para el fondo de los botones (Se mantienen para el efecto down)
-    private Texture buttonDownTexture;
+    // Texturas para el fondo de los botones
+    private Texture texturaBotonPresionado;
 
-    // Images dentro de los botones para poder cambiar la textura
-    private Image newGameImage;
-    private Image optionsImage;
-    private Image exitImage;
-    private Image solitaireNewGameImage; // Unique field for solitaire button image
-    private Image solitaireContinueGameImage; // Unique field for solitaire button image
+    // Imagenes dentro de los botones para poder cambiar la textura
+    private Image imagenNuevaPartida;
+    private Image imagenOpciones;
+    private Image imagenSalir;
+    private Image imagenSolitarioNuevaPartida;
+    private Image imagenSolitarioContinuarPartida;
 
-    // Images for sub-menus
-    private Image helpImage;
-    private Image aboutImage;
-    private Image backOptionsImage;
-    private Image singlePlayerImage;
-    private Image multiPlayerImage;
-    private Image backNewGameImage;
+    // Imagenes para sub-menus
+    private Image imagenAyuda;
+    private Image imagenAcercaDe;
+    private Image imagenVolverOpciones;
+    private Image imagenSolitario;
+    private Image imagenMultijugador;
+    private Image imagenVolverNuevaPartida;
 
-    // Labels for Solitario Submenu (Label-style)
-    private Label solitarioNewGameLabel;
-    private Label solitarioContinueGameLabel;
-    private Label solitarioBackLabel;
-    private Label solitarioTitleLabel;
+    // Etiquetas para el submenu de solitario
+    private Label etiquetaSolitarioNuevaPartida;
+    private Label etiquetaSolitarioContinuarPartida;
+    private Label etiquetaSolitarioVolver;
+    private Label etiquetaSolitarioTitulo;
 
-    // --- Estructura de Menú y Navegación ---
+    // Enum para el estado del menu
     public enum MenuState {
         MAIN, OPTIONS_SUB, PLAY_SUB, SOLITARIO_SUB
     }
 
     private MenuState currentState = MenuState.MAIN;
-    private MenuState startState = MenuState.MAIN;
+    private MenuState estadoInicial = MenuState.MAIN;
 
-    private Button[] currentButtons;
-    private Button[] mainMenuButtons;
-    private Button[] optionsSubMenuButtons;
-    private Button[] playSubMenuButtons;
-    private Button[] solitarioSubMenuButtons;
+    private Button[] botonesActuales;
+    private Button[] botonesMenuPrincipal;
+    private Button[] botonesSubMenuOpciones;
+    private Button[] botonesSubMenuJugar;
+    private Button[] botonesSubMenuSolitario;
 
-    private Button exitButton;
+    private Button botonSalir;
 
-    private Table mainTable;
-    private Table optionsSubMenuTable;
-    private Table playSubMenuTable;
-    private Table solitarioSubMenuTable;
-    private Table footerTable;
-    private Table headerTable;
+    private Table tablaPrincipal;
+    private Table tablaSubMenuOpciones;
+    private Table tablaSubMenuJugar;
+    private Table tablaSubMenuSolitario;
+    private Table tablaPie;
+    private Table tablaCabecera;
 
-    private int selectedIndex = 0;
+    private int indiceSeleccionado = 0;
 
-    // --- Variables de Transición (Anti-Flicker) ---
-    private final float fadeDuration = 0.5f;
-    private float fadeTimer = 0f;
-    private Texture blackPixelTexture;
-    private boolean isInputEnabled = false;
-    private boolean skipInitialFade = false;
+    // Variables de Transición
+    private final float duracionDesvanecimiento = 1.0f;
+    private float temporizadorDesvanecimiento = 0f;
+    private Texture texturaPixelNegro;
+    private boolean entradaHabilitada = false;
+    private boolean entradaDesvanecimientoInicializada = false;
+    private boolean saltarDesvanecimientoInicial = false;
 
-    // --- Variables para Error Overlay ---
-    private Table errorTable;
-    private Label errorLabel;
-    private Button errorOkButton;
-    private Image okErrorImage;
-    // ---------------------------------------------
+    // Variables para Error Overlay
+    private Table tablaError;
+    private Label etiquetaError;
+    private Button botonErrorOk;
+    private Image imagenOkError;
 
-    // ---------------------------------------------
+    // Variables para IP Dialog (Overlay)
+    private Table tablaDialogoIp;
+    private TextField campoTextoIp;
+    private Button botonIpConectar;
+    private Button botonIpCancelar;
+    private boolean esVisibleDialogoIp = false;
 
-    public MenuPrincipal(Proyecto game) {
-        this.game = game;
+    public MenuPrincipal(Proyecto juego) {
+        this.juego = juego;
     }
 
-    public MenuPrincipal(Proyecto game, boolean skipInitialFade) {
-        this.game = game;
-        this.skipInitialFade = skipInitialFade;
+    public MenuPrincipal(Proyecto juego, boolean saltarDesvanecimientoInicial) {
+        this.juego = juego;
+        this.saltarDesvanecimientoInicial = saltarDesvanecimientoInicial;
     }
 
-    public MenuPrincipal(Proyecto game, boolean skipInitialFade, MenuState startState) {
-        this.game = game;
-        this.skipInitialFade = skipInitialFade;
-        this.startState = startState;
+    public MenuPrincipal(Proyecto juego, boolean saltarDesvanecimientoInicial, MenuState estadoInicial) {
+        this.juego = juego;
+        this.saltarDesvanecimientoInicial = saltarDesvanecimientoInicial;
+        this.estadoInicial = estadoInicial;
     }
 
     @Override
     public void show() {
+        juego.playMusic("musica/jumpUp.mp3");
         // Cargar fuente personalizada "ari-w9500-bold.ttf"
-        try {
-            FreeTypeFontGenerator generator = new FreeTypeFontGenerator(
-                    Gdx.files.internal("Mapa/ari-w9500-bold.ttf"));
-            FreeTypeFontParameter parameter = new FreeTypeFontParameter();
-            parameter.size = 28;
-            parameter.color = Color.WHITE;
-            parameter.characters = FreeTypeFontGenerator.DEFAULT_CHARS + "áéíóúÁÉÍÓÚñÑ¿¡";
-            font = generator.generateFont(parameter);
-            generator.dispose();
-        } catch (Exception e) {
-            Gdx.app.error("MENU", "Error al cargar la fuente. Usando BitmapFont por defecto.", e);
-            font = new BitmapFont();
-        }
+        FreeTypeFontGenerator generator = new FreeTypeFontGenerator(
+                Gdx.files.internal("Mapa/ari-w9500-bold.ttf"));
+        FreeTypeFontParameter parameter = new FreeTypeFontParameter();
+        parameter.size = 28;
+        parameter.color = Color.WHITE;
+        parameter.characters = FreeTypeFontGenerator.DEFAULT_CHARS + "áéíóúÁÉÍÓÚñÑ¿¡";
+        fuente = generator.generateFont(parameter);
+        generator.dispose();
 
-        // --- Inicialización de Texturas ---
+        // INICIALIZACIÓN DE TEXTURAS
 
-        // 1. Texturas de Fondo (Solo usamos el Down para el feedback visual)
+        // Texturas de Fondo
         Texture buttonUpTextureDummy = createColoredTexture(Color.CLEAR);
-        buttonDownTexture = createColoredTexture(new Color(0.1f, 0.5f, 0.8f, 0.7f));
+        texturaBotonPresionado = createColoredTexture(new Color(0.1f, 0.5f, 0.8f, 0.7f));
 
-        // 2. Texturas de PNG (simulamos que existen)
-        newGameButtonTexture = loadTexture("imagenes/jugar copy.png", new Color(0.8f, 0.2f, 0.2f, 0.8f));
-        newGameButtonSelectedTexture = loadTexture("imagenes/jugarR.png", new Color(1f, 0.8f, 0.2f, 1f));
-        continueGameButtonTexture = loadTexture("imagenes/continuarJuego.png", new Color(0.2f, 0.8f, 0.2f, 0.8f));
-        continueGameButtonSelectedTexture = loadTexture("imagenes/continuarS.png", new Color(1f, 0.8f, 0.2f, 1f));
-        optionsButtonTexture = loadTexture("imagenes/opciones (2).png", new Color(0.2f, 0.2f, 0.8f, 0.8f));
-        optionsButtonSelectedTexture = loadTexture("imagenes/opcionesS.png", new Color(1f, 0.8f, 0.2f, 1f));
-        exitButtonTexture = loadTexture("imagenes/salir (2).png", new Color(0.8f, 0.8f, 0.2f, 0.8f));
-        exitButtonSelectedTexture = loadTexture("imagenes/salirS.png", new Color(1f, 0.8f, 0.2f, 1f));
-        helpButtonTexture = loadTexture("imagenes/ayud.png", new Color(0.1f, 0.5f, 0.8f, 0.8f));
-        helpButtonSelectedTexture = loadTexture("imagenes/ayudS.png", new Color(0.2f, 0.8f, 1f, 1f));
-        aboutButtonTexture = loadTexture("imagenes/acerc.png", new Color(0.5f, 0.1f, 0.8f, 0.8f));
-        aboutButtonSelectedTexture = loadTexture("imagenes/acercS.png", new Color(0.8f, 0.2f, 1f, 1f));
-        backButtonTexture = loadTexture("imagenes/volv.png", new Color(0.8f, 0.1f, 0.5f, 0.8f));
-        backButtonSelectedTexture = loadTexture("imagenes/volvS.png", new Color(1f, 0.2f, 0.6f, 1f));
-        singlePlayerButtonTexture = loadTexture("imagenes/solit.png", new Color(0.1f, 0.8f, 0.5f, 0.8f));
-        singlePlayerButtonSelectedTexture = loadTexture("imagenes/solitS.png", new Color(0.2f, 1f, 0.6f, 1f));
-        multiPlayerButtonTexture = loadTexture("imagenes/multi.png", new Color(0.5f, 0.8f, 0.1f, 0.8f));
-        multiPlayerButtonSelectedTexture = loadTexture("imagenes/multiS.png", new Color(0.8f, 1f, 0.2f, 1f));
+        // Texturas de PNG
+        texturaBotonNuevaPartida = loadTexture("imagenes/jugar copy.png", new Color(0.8f, 0.2f, 0.2f, 0.8f));
+        texturaBotonNuevaPartidaSeleccionado = loadTexture("imagenes/jugarR.png", new Color(1f, 0.8f, 0.2f, 1f));
+        texturaBotonContinuar = loadTexture("imagenes/continuarJuego.png", new Color(0.2f, 0.8f, 0.2f, 0.8f));
+        texturaBotonContinuarSeleccionado = loadTexture("imagenes/continuarS.png", new Color(1f, 0.8f, 0.2f, 1f));
+        texturaBotonOpciones = loadTexture("imagenes/opciones (2).png", new Color(0.2f, 0.2f, 0.8f, 0.8f));
+        texturaBotonOpcionesSeleccionado = loadTexture("imagenes/opcionesS.png", new Color(1f, 0.8f, 0.2f, 1f));
+        texturaBotonSalir = loadTexture("imagenes/salir (2).png", new Color(0.8f, 0.8f, 0.2f, 0.8f));
+        texturaBotonSalirSeleccionado = loadTexture("imagenes/salirS.png", new Color(1f, 0.8f, 0.2f, 1f));
+        texturaBotonAyuda = loadTexture("imagenes/ayud.png", new Color(0.1f, 0.5f, 0.8f, 0.8f));
+        texturaBotonAyudaSeleccionado = loadTexture("imagenes/ayudS.png", new Color(0.2f, 0.8f, 1f, 1f));
+        texturaBotonAcercaDe = loadTexture("imagenes/acerc.png", new Color(0.5f, 0.1f, 0.8f, 0.8f));
+        texturaBotonAcercaDeSeleccionado = loadTexture("imagenes/acercS.png", new Color(0.8f, 0.2f, 1f, 1f));
+        texturaBotonVolver = loadTexture("imagenes/volv.png", new Color(0.8f, 0.1f, 0.5f, 0.8f));
+        texturaBotonVolverSeleccionado = loadTexture("imagenes/volvS.png", new Color(1f, 0.2f, 0.6f, 1f));
+        texturaBotonSolitario = loadTexture("imagenes/solit.png", new Color(0.1f, 0.8f, 0.5f, 0.8f));
+        texturaBotonSolitarioSeleccionado = loadTexture("imagenes/solitS.png", new Color(0.2f, 1f, 0.6f, 1f));
+        texturaBotonMultijugador = loadTexture("imagenes/multi.png", new Color(0.5f, 0.8f, 0.1f, 0.8f));
+        texturaBotonMultijugadorSeleccionado = loadTexture("imagenes/multiS.png", new Color(0.8f, 1f, 0.2f, 1f));
 
-        // 3. Texturas de Fondo y Título
+        // Texturas de Fondo y Título
 
         Pixmap pixmapOverlay = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmapOverlay.setColor(Color.BLACK);
         pixmapOverlay.fill();
-        blackPixelTexture = new Texture(pixmapOverlay);
+        texturaPixelNegro = new Texture(pixmapOverlay);
         pixmapOverlay.dispose();
 
-        backgroundTexture = new Texture(Gdx.files.internal("imagenes/fondoPixelado.png"));
-        backgroundImage = new Image(backgroundTexture);
-        titleTexture = new Texture(Gdx.files.internal("imagenes/Men-Principal-11-11-2025.png"));
-        titleImage = new Image(titleTexture);
+        texturaFondo = new Texture(Gdx.files.internal("imagenes/fondoPixelado.png"));
+        imagenFondo = new Image(texturaFondo);
+        texturaTitulo = new Texture(Gdx.files.internal("imagenes/Men-Principal-11-11-2025.png"));
+        imagenTitulo = new Image(texturaTitulo);
 
-        // --- Estilos de Botón Base ---
+        // Estilos de Botón Base
         ButtonStyle defaultStyle = new ButtonStyle();
         defaultStyle.up = new TextureRegionDrawable(buttonUpTextureDummy);
-        defaultStyle.down = new TextureRegionDrawable(buttonDownTexture);
+        defaultStyle.down = new TextureRegionDrawable(texturaBotonPresionado);
 
-        // --- Creación de Botones (Ahora son Button con un Image dentro) ---
+        // CREACIÓN DE BOTONES
 
-        // Menú Principal - Guardamos las referencias a las imágenes
-        newGameImage = new Image(newGameButtonTexture);
-        Button newGameButton = new Button(defaultStyle);
-        newGameButton.add(newGameImage).grow();
+        // Menú Principal
+        imagenNuevaPartida = new Image(texturaBotonNuevaPartida);
+        Button botonNuevaPartida = new Button(defaultStyle);
+        botonNuevaPartida.add(imagenNuevaPartida).grow();
 
-        Image continueGameImage = new Image(continueGameButtonTexture); // Local image for continue
-        Button continueGameButton = new Button(defaultStyle);
-        continueGameButton.add(continueGameImage).grow();
+        Image imagenContinuarJuego = new Image(texturaBotonContinuar);
+        Button botonContinuarJuego = new Button(defaultStyle);
+        botonContinuarJuego.add(imagenContinuarJuego).grow();
 
-        optionsImage = new Image(optionsButtonTexture);
-        Button optionsButton = new Button(defaultStyle);
-        optionsButton.add(optionsImage).grow();
+        imagenOpciones = new Image(texturaBotonOpciones);
+        Button botonOpciones = new Button(defaultStyle);
+        botonOpciones.add(imagenOpciones).grow();
 
-        exitImage = new Image(exitButtonTexture);
-        exitButton = new Button(defaultStyle);
-        exitButton.add(exitImage).grow();
+        imagenSalir = new Image(texturaBotonSalir);
+        botonSalir = new Button(defaultStyle);
+        botonSalir.add(imagenSalir).grow();
 
-        // Sub Menu (Opciones)
-        helpImage = new Image(helpButtonTexture);
-        Button helpButton = new Button(defaultStyle);
-        helpButton.add(helpImage).grow();
+        // Sub-Menu Opciones
+        imagenAyuda = new Image(texturaBotonAyuda);
+        Button botonAyuda = new Button(defaultStyle);
+        botonAyuda.add(imagenAyuda).grow();
 
-        aboutImage = new Image(aboutButtonTexture);
-        Button aboutButton = new Button(defaultStyle);
-        aboutButton.add(aboutImage).grow();
+        imagenAcercaDe = new Image(texturaBotonAcercaDe);
+        Button botonAcercaDe = new Button(defaultStyle);
+        botonAcercaDe.add(imagenAcercaDe).grow();
 
-        backOptionsImage = new Image(backButtonTexture);
-        Button backOptionsButton = new Button(defaultStyle);
-        backOptionsButton.add(backOptionsImage).grow();
+        imagenVolverOpciones = new Image(texturaBotonVolver);
+        Button botonVolverOpciones = new Button(defaultStyle);
+        botonVolverOpciones.add(imagenVolverOpciones).grow();
 
-        // Sub Menu (Nuevo Juego)
-        singlePlayerImage = new Image(singlePlayerButtonTexture);
-        Button singlePlayerButton = new Button(defaultStyle);
-        singlePlayerButton.add(singlePlayerImage).grow();
+        // Sub-Menu Nueva Partida
+        imagenSolitario = new Image(texturaBotonSolitario);
+        Button botonSolitario = new Button(defaultStyle);
+        botonSolitario.add(imagenSolitario).grow();
 
-        multiPlayerImage = new Image(multiPlayerButtonTexture);
-        Button multiPlayerButton = new Button(defaultStyle);
-        multiPlayerButton.add(multiPlayerImage).grow();
+        imagenMultijugador = new Image(texturaBotonMultijugador);
+        Button botonMultijugador = new Button(defaultStyle);
+        botonMultijugador.add(imagenMultijugador).grow();
 
-        backNewGameImage = new Image(backButtonTexture);
-        Button backPlayButton = new Button(defaultStyle);
-        backPlayButton.add(backNewGameImage).grow();
+        imagenVolverNuevaPartida = new Image(texturaBotonVolver);
+        Button botonVolverNuevaPartida = new Button(defaultStyle);
+        botonVolverNuevaPartida.add(imagenVolverNuevaPartida).grow();
 
         // Sub Menu (Solitario: Nuevo/Continuar)
-        solitaireNewGameImage = new Image(newGameButtonTexture);
-        Button startNewGameButton = new Button(defaultStyle);
-        startNewGameButton.add(solitaireNewGameImage).grow();
+        imagenSolitarioNuevaPartida = new Image(texturaBotonNuevaPartida);
+        Button botonIniciarNuevaPartida = new Button(defaultStyle);
+        botonIniciarNuevaPartida.add(imagenSolitarioNuevaPartida).grow();
 
-        solitaireContinueGameImage = new Image(continueGameButtonTexture);
-        Button startContinueGameButton = new Button(defaultStyle);
-        startContinueGameButton.add(solitaireContinueGameImage).grow();
+        imagenSolitarioContinuarPartida = new Image(texturaBotonContinuar);
+        Button botonIniciarContinuarPartida = new Button(defaultStyle);
+        botonIniciarContinuarPartida.add(imagenSolitarioContinuarPartida).grow();
 
-        Button backSolitarioButton = new Button(defaultStyle);
-        backSolitarioButton.add(new Image(backButtonTexture)).grow();
+        Button botonVolverSolitario = new Button(defaultStyle);
+        botonVolverSolitario.add(new Image(texturaBotonVolver)).grow();
 
-        // --- Definición de Arrays de Botones ---
-        mainMenuButtons = new Button[] { newGameButton, optionsButton, exitButton };
-        optionsSubMenuButtons = new Button[] { helpButton, aboutButton, backOptionsButton };
-        playSubMenuButtons = new Button[] { singlePlayerButton, multiPlayerButton, backPlayButton };
-        solitarioSubMenuButtons = new Button[] { startNewGameButton, continueGameButton, backSolitarioButton };
+        // Definición de Arrays de Botones
+        botonesMenuPrincipal = new Button[] { botonNuevaPartida, botonOpciones, botonSalir };
+        botonesSubMenuOpciones = new Button[] { botonAyuda, botonAcercaDe, botonVolverOpciones };
+        botonesSubMenuJugar = new Button[] { botonSolitario, botonMultijugador, botonVolverNuevaPartida };
+        botonesSubMenuSolitario = new Button[] { botonIniciarNuevaPartida, botonIniciarContinuarPartida,
+                botonVolverSolitario };
 
-        currentButtons = mainMenuButtons;
+        botonesActuales = botonesMenuPrincipal;
 
-        stage = new Stage(new FitViewport(Proyecto.PANTALLA_W, Proyecto.PANTALLA_H));
+        escenario = new Stage(new FitViewport(Proyecto.PANTALLA_W, Proyecto.PANTALLA_H));
 
-        // --- Configuración del Stage y Tablas ---
+        // Configuración del Stage y Tablas
 
-        backgroundImage.setFillParent(true);
-        stage.addActor(backgroundImage);
+        imagenFondo.setFillParent(true);
+        escenario.addActor(imagenFondo);
 
-        // --- Tabla de Cabecera (Título Fijo) - OCULTO ---
-        headerTable = new Table();
-        headerTable.setFillParent(true);
-        headerTable.top();
-        headerTable.add(titleImage).width(600).height(200).padTop(50).padBottom(0);
-        headerTable.setVisible(false); // Título oculto
-        stage.addActor(headerTable);
+        // Tabla de Cabecera (Título Fijo)
+        tablaCabecera = new Table();
+        tablaCabecera.setFillParent(true);
+        tablaCabecera.top();
+        tablaCabecera.add(imagenTitulo).width(600).height(200).padTop(50).padBottom(0);
+        tablaCabecera.setVisible(false);
+        escenario.addActor(tablaCabecera);
 
         // Tabla Principal (Alineada a la izquierda)
-        mainTable = new Table();
-        mainTable.setFillParent(true);
+        tablaPrincipal = new Table();
+        tablaPrincipal.setFillParent(true);
 
-        mainTable.center().left(); // Alineación centrada verticalmente, izquierda horizontal
-        mainTable.clearChildren();
+        tablaPrincipal.center().left();
+        tablaPrincipal.clearChildren();
 
         // Padding superior e izquierdo para posicionar los botones más abajo
-        mainTable.padTop(200).padLeft(50).row();
+        tablaPrincipal.padTop(200).padLeft(50).row();
 
         // Botones principales (tamaño reducido)
         float mainButtonWidth = 300f;
         float mainButtonHeight = 110f;
-        float buttonSpacing = 20f; // Mayor separación entre botones
+        float buttonSpacing = 20f;
 
-        mainTable.add(newGameButton).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing).left()
-                .row();
-        mainTable.add(optionsButton).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing).left()
-                .row();
+        tablaPrincipal.add(botonNuevaPartida).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
+                .left().row();
+        tablaPrincipal.add(botonOpciones).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
+                .left().row();
 
-        // Agregamos un growY() final para empujar todo hacia arriba y llenar el resto
-        // del espacio.
-        mainTable.add().growY().row(); // Keep simple growY if needed, but with center() might behave differently.
-        // Actually if we use center(), we might not need growY. Let's remove it to let
-        // center() work.
-        // mainTable.add().growY().row();
+        tablaPrincipal.add().growY().row();
 
-        stage.addActor(mainTable);
+        escenario.addActor(tablaPrincipal);
 
-        // Ya no usamos cursor, la selección se muestra cambiando la textura del botón
+        // Tabla para el botón de SALIR
+        tablaPie = new Table();
+        tablaPie.setFillParent(true);
+        tablaPie.bottom().left();
+        tablaPie.add(botonSalir).width(mainButtonWidth).height(mainButtonHeight).pad(20).align(Align.bottomLeft);
+        escenario.addActor(tablaPie);
 
-        // Tabla para el botón de SALIR (Esquina Inferior Izquierda)
-        footerTable = new Table();
-        footerTable.setFillParent(true);
-        footerTable.bottom().left(); // Cambiado a izquierda
-        footerTable.add(exitButton).width(mainButtonWidth).height(mainButtonHeight).pad(20).align(Align.bottomLeft);
-        stage.addActor(footerTable);
-
-        // ----------------------------------------------------------------------
         // Tablas Sub-Menú (Opciones)
-        // ----------------------------------------------------------------------
 
-        optionsSubMenuTable = new Table();
-        optionsSubMenuTable.setFillParent(true);
-        optionsSubMenuTable.center().left(); // Centrado verticalmente a la izquierda
-        optionsSubMenuTable.padTop(65).padLeft(50).row();
+        tablaSubMenuOpciones = new Table();
+        tablaSubMenuOpciones.setFillParent(true);
+        tablaSubMenuOpciones.center().left();
+        tablaSubMenuOpciones.padTop(65).padLeft(50).row();
 
-        optionsSubMenuTable.add(helpButton).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
+        tablaSubMenuOpciones.add(botonAyuda).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
                 .left().row();
-        optionsSubMenuTable.add(aboutButton).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
+        tablaSubMenuOpciones.add(botonAcercaDe).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
                 .left().row();
-        optionsSubMenuTable.add(backOptionsButton).width(mainButtonWidth).height(mainButtonHeight)
+        tablaSubMenuOpciones.add(botonVolverOpciones).width(mainButtonWidth).height(mainButtonHeight)
                 .padBottom(buttonSpacing).left().row();
 
-        optionsSubMenuTable.setVisible(false);
-        stage.addActor(optionsSubMenuTable);
+        tablaSubMenuOpciones.setVisible(false);
+        escenario.addActor(tablaSubMenuOpciones);
 
-        // ----------------------------------------------------------------------
         // Tablas Sub-Menú (Jugar)
-        // ----------------------------------------------------------------------
 
-        playSubMenuTable = new Table();
-        playSubMenuTable.setFillParent(true);
-        playSubMenuTable.center().left();
-        playSubMenuTable.padTop(65).padLeft(50).row();
+        tablaSubMenuJugar = new Table();
+        tablaSubMenuJugar.setFillParent(true);
+        tablaSubMenuJugar.center().left();
+        tablaSubMenuJugar.padTop(65).padLeft(50).row();
 
-        playSubMenuTable.add(singlePlayerButton).width(mainButtonWidth).height(mainButtonHeight)
-                .padBottom(buttonSpacing)
+        tablaSubMenuJugar.add(botonSolitario).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
                 .left().row();
-        playSubMenuTable.add(multiPlayerButton).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
-                .left().row();
-        playSubMenuTable.add(backPlayButton).width(mainButtonWidth).height(mainButtonHeight).padBottom(buttonSpacing)
-                .left().row();
+        tablaSubMenuJugar.add(botonMultijugador).width(mainButtonWidth).height(mainButtonHeight)
+                .padBottom(buttonSpacing).left().row();
+        tablaSubMenuJugar.add(botonVolverNuevaPartida).width(mainButtonWidth).height(mainButtonHeight)
+                .padBottom(buttonSpacing).left().row();
 
-        playSubMenuTable.setVisible(false);
-        stage.addActor(playSubMenuTable);
+        tablaSubMenuJugar.setVisible(false);
+        escenario.addActor(tablaSubMenuJugar);
 
-        // ----------------------------------------------------------------------
-        // Tablas Sub-Menú (Solitario: Nuevo/Continuar) - REFACTORIZADO A LABELS
-        // ----------------------------------------------------------------------
+        // Tablas Sub-Menú (Solitario: Nuevo/Continuar)
 
-        LabelStyle solitarioTitleStyle = new LabelStyle(font, Color.YELLOW);
-        LabelStyle solitarioLabelStyle = new LabelStyle(font, Color.WHITE);
+        LabelStyle estiloTituloSolitario = new LabelStyle(fuente, Color.YELLOW);
+        LabelStyle estiloEtiquetaSolitario = new LabelStyle(fuente, Color.WHITE);
 
-        solitarioTitleLabel = new Label("--- MODO SOLITARIO ---", solitarioTitleStyle);
-        solitarioNewGameLabel = new Label("Nuevo Juego", solitarioLabelStyle);
-        solitarioContinueGameLabel = new Label("Continuar Juego", solitarioLabelStyle);
-        solitarioBackLabel = new Label("Volver", solitarioLabelStyle);
+        etiquetaSolitarioTitulo = new Label("--- MODO SOLITARIO ---", estiloTituloSolitario);
+        etiquetaSolitarioNuevaPartida = new Label("Nuevo Juego", estiloEtiquetaSolitario);
+        etiquetaSolitarioContinuarPartida = new Label("Continuar Juego", estiloEtiquetaSolitario);
+        etiquetaSolitarioVolver = new Label("Volver", estiloEtiquetaSolitario);
 
-        // Background semi-transparente para el "overlay"
         Texture darkBackground = createColoredTexture(new Color(0.1f, 0.1f, 0.1f, 0.85f));
         TextureRegionDrawable backgroundDrawable = new TextureRegionDrawable(darkBackground);
 
-        solitarioSubMenuTable = new Table();
-        solitarioSubMenuTable.setBackground(backgroundDrawable);
-        solitarioSubMenuTable.pad(40);
+        tablaSubMenuSolitario = new Table();
+        tablaSubMenuSolitario.setBackground(backgroundDrawable);
+        tablaSubMenuSolitario.pad(40);
 
-        solitarioSubMenuTable.add(solitarioTitleLabel).padBottom(30).row();
-        solitarioSubMenuTable.add(solitarioNewGameLabel).padBottom(20).row();
-        solitarioSubMenuTable.add(solitarioContinueGameLabel).padBottom(20).row();
-        solitarioSubMenuTable.add(solitarioBackLabel).padBottom(10).row();
+        tablaSubMenuSolitario.add(etiquetaSolitarioTitulo).padBottom(30).row();
+        tablaSubMenuSolitario.add(etiquetaSolitarioNuevaPartida).padBottom(20).row();
+        tablaSubMenuSolitario.add(etiquetaSolitarioContinuarPartida).padBottom(20).row();
+        tablaSubMenuSolitario.add(etiquetaSolitarioVolver).padBottom(10).row();
 
-        solitarioSubMenuTable.pack(); // Ajustar al contenido
+        tablaSubMenuSolitario.pack();
 
-        // Centrar en pantalla
-        solitarioSubMenuTable.setPosition(
-                (Proyecto.PANTALLA_W - solitarioSubMenuTable.getWidth()) / 2,
-                (Proyecto.PANTALLA_H - solitarioSubMenuTable.getHeight()) / 2);
+        tablaSubMenuSolitario.setPosition(
+                (Proyecto.PANTALLA_W - tablaSubMenuSolitario.getWidth()) / 2,
+                (Proyecto.PANTALLA_H - tablaSubMenuSolitario.getHeight()) / 2);
 
-        solitarioSubMenuTable.setVisible(false);
-        stage.addActor(solitarioSubMenuTable);
+        tablaSubMenuSolitario.setVisible(false);
+        escenario.addActor(tablaSubMenuSolitario);
 
-        // --- Tabla de Error (Overlay) ---
-        errorTable = new Table();
-        errorTable.setBackground(backgroundDrawable); // Reutilizamos el fondo oscuro
-        errorTable.pad(40);
+        // Tabla de Error (Overlay)
+        tablaError = new Table();
+        tablaError.setBackground(backgroundDrawable);
+        tablaError.pad(40);
 
-        LabelStyle errorLabelStyle = new LabelStyle(font, Color.RED);
-        errorLabel = new Label("Error", errorLabelStyle);
-        errorLabel.setWrap(true);
-        errorLabel.setAlignment(Align.center);
+        LabelStyle estiloEtiquetaError = new LabelStyle(fuente, Color.RED);
+        etiquetaError = new Label("Error", estiloEtiquetaError);
+        etiquetaError.setWrap(true);
+        etiquetaError.setAlignment(Align.center);
 
-        // Boton OK para error
-        okErrorImage = new Image(backButtonTexture); // Reutilizamos textura de volver
-        errorOkButton = new Button(defaultStyle);
-        errorOkButton.add(okErrorImage).grow();
+        imagenOkError = new Image(texturaBotonVolver);
+        botonErrorOk = new Button(defaultStyle);
+        botonErrorOk.add(imagenOkError).grow();
 
-        errorTable.add(errorLabel).width(400).padBottom(30).row();
-        errorTable.add(errorOkButton).width(mainButtonWidth).height(mainButtonHeight).row();
+        tablaError.add(etiquetaError).width(400).padBottom(30).row();
+        tablaError.add(botonErrorOk).width(mainButtonWidth).height(mainButtonHeight).row();
 
-        errorTable.pack();
-        errorTable.setPosition(
-                (Proyecto.PANTALLA_W - errorTable.getWidth()) / 2,
-                (Proyecto.PANTALLA_H - errorTable.getHeight()) / 2);
+        tablaError.pack();
+        tablaError.setPosition(
+                (Proyecto.PANTALLA_W - tablaError.getWidth()) / 2,
+                (Proyecto.PANTALLA_H - tablaError.getHeight()) / 2);
 
-        errorTable.setVisible(false);
-        stage.addActor(errorTable);
+        tablaError.setVisible(false);
+        escenario.addActor(tablaError);
 
-        errorOkButton.addListener(new ClickListener() {
+        botonErrorOk.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 closeError();
             }
         });
 
-        // --- Click Listeners para el Modo Solitario ---
-        solitarioNewGameLabel.addListener(new ClickListener() {
+        // Tabla de IP Input (Overlay)
+        tablaDialogoIp = new Table();
+        tablaDialogoIp.setBackground(backgroundDrawable);
+        tablaDialogoIp.pad(40);
+
+        LabelStyle estiloEtiquetaIp = new LabelStyle(fuente, Color.WHITE);
+        Label etiquetaInstruccionIp = new Label("Ingresa la IP del Servidor:", estiloEtiquetaIp);
+        etiquetaInstruccionIp.setAlignment(Align.center);
+
+        TextFieldStyle estiloCampoTexto = new TextFieldStyle();
+        estiloCampoTexto.font = fuente;
+        estiloCampoTexto.fontColor = Color.WHITE;
+        Texture pixelBlanco = createColoredTexture(Color.WHITE);
+        estiloCampoTexto.cursor = new TextureRegionDrawable(pixelBlanco);
+        estiloCampoTexto.selection = new TextureRegionDrawable(
+                new TextureRegionDrawable(createColoredTexture(Color.BLUE)));
+        estiloCampoTexto.background = new TextureRegionDrawable(createColoredTexture(new Color(0.3f, 0.3f, 0.3f, 1f)));
+
+        campoTextoIp = new TextField("localhost", estiloCampoTexto);
+        campoTextoIp.setAlignment(Align.center);
+
+        Label etiquetaConectar = new Label("Conectar", estiloEtiquetaIp);
+        botonIpConectar = new Button(defaultStyle);
+        botonIpConectar.add(etiquetaConectar).center();
+
+        Label etiquetaCancelar = new Label("Cancelar", estiloEtiquetaIp);
+        botonIpCancelar = new Button(defaultStyle);
+        botonIpCancelar.add(etiquetaCancelar).center();
+
+        tablaDialogoIp.add(etiquetaInstruccionIp).colspan(2).padBottom(20).center().row();
+        tablaDialogoIp.add(campoTextoIp).width(400).height(50).colspan(2).padBottom(30).center().row();
+        tablaDialogoIp.add(botonIpConectar).width(200).height(60).padRight(20);
+        tablaDialogoIp.add(botonIpCancelar).width(200).height(60).row();
+
+        tablaDialogoIp.pack();
+        tablaDialogoIp.setPosition(
+                (Proyecto.PANTALLA_W - tablaDialogoIp.getWidth()) / 2,
+                (Proyecto.PANTALLA_H - tablaDialogoIp.getHeight()) / 2);
+
+        tablaDialogoIp.setVisible(false);
+        escenario.addActor(tablaDialogoIp);
+
+        // Listeners para IP Dialog
+        botonIpConectar.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                selectedIndex = 0;
+                String ip = campoTextoIp.getText();
+                if (ip == null || ip.trim().isEmpty())
+                    ip = "localhost";
+                Gdx.app.log("MENU", "Conectando a IP: " + ip);
+                juego.setScreen(new ScreenMultiplayer(juego, ip));
+            }
+        });
+
+        botonIpCancelar.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                hideIpDialog();
+            }
+        });
+
+        // Click Listeners para el Modo Solitario
+        etiquetaSolitarioNuevaPartida.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                indiceSeleccionado = 0;
                 executeAction(0);
             }
         });
 
-        solitarioContinueGameLabel.addListener(new ClickListener() {
+        etiquetaSolitarioContinuarPartida.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                selectedIndex = 1;
+                indiceSeleccionado = 1;
                 executeAction(1);
             }
         });
 
-        solitarioBackLabel.addListener(new ClickListener() {
+        etiquetaSolitarioVolver.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                selectedIndex = 2;
+                indiceSeleccionado = 2;
                 executeAction(2);
             }
         });
 
-        // --- Lógica de Transición Inicial ---
-        if (skipInitialFade) {
-            fadeTimer = fadeDuration;
+        // Lógica de Transición Inicial
+        if (saltarDesvanecimientoInicial) {
+            temporizadorDesvanecimiento = duracionDesvanecimiento;
         }
 
-        // --- Listeners (Ajustado el de Nuevo Juego/Solitario) ---
-        for (int i = 0; i < mainMenuButtons.length; i++) {
+        // Listeners (Ajustado el de Nuevo Juego/Solitario)
+        for (int i = 0; i < botonesMenuPrincipal.length; i++) {
             final int index = i;
-            mainMenuButtons[i].addListener(new ChangeListener() {
+            botonesMenuPrincipal[i].addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
-                    if (isInputEnabled && currentState == MenuState.MAIN)
+                    if (entradaHabilitada && currentState == MenuState.MAIN)
                         executeAction(index);
                 }
             });
         }
 
-        exitButton.addListener(new ChangeListener() {
+        botonSalir.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                if (isInputEnabled && currentState == MenuState.MAIN) {
+                if (entradaHabilitada && currentState == MenuState.MAIN) {
                     Gdx.app.log("MENU", "Saliendo del juego...");
                     Gdx.app.exit();
                 }
@@ -479,91 +527,81 @@ public class MenuPrincipal implements Screen, InputProcessor {
         });
 
         // Submenu Options Listeners
-        for (int i = 0; i < optionsSubMenuButtons.length; i++) {
+        for (int i = 0; i < botonesSubMenuOpciones.length; i++) {
             final int index = i;
-            optionsSubMenuButtons[i].addListener(new ChangeListener() {
+            botonesSubMenuOpciones[i].addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
-                    if (isInputEnabled && currentState == MenuState.OPTIONS_SUB)
+                    if (entradaHabilitada && currentState == MenuState.OPTIONS_SUB)
                         executeAction(index);
                 }
             });
         }
 
         // Submenu Play Listeners
-        for (int i = 0; i < playSubMenuButtons.length; i++) {
+        for (int i = 0; i < botonesSubMenuJugar.length; i++) {
             final int index = i;
-            playSubMenuButtons[i].addListener(new ChangeListener() {
+            botonesSubMenuJugar[i].addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
-                    if (isInputEnabled && currentState == MenuState.PLAY_SUB)
+                    if (entradaHabilitada && currentState == MenuState.PLAY_SUB)
                         executeAction(index);
                 }
             });
         }
 
         // Submenu Solitario Listeners
-        for (int i = 0; i < solitarioSubMenuButtons.length; i++) {
+        for (int i = 0; i < botonesSubMenuSolitario.length; i++) {
             final int index = i;
-            solitarioSubMenuButtons[i].addListener(new ChangeListener() {
+            botonesSubMenuSolitario[i].addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
-                    if (isInputEnabled && currentState == MenuState.SOLITARIO_SUB)
+                    if (entradaHabilitada && currentState == MenuState.SOLITARIO_SUB)
                         executeAction(index);
                 }
             });
         }
 
-        switchMenu(startState);
+        switchMenu(estadoInicial);
     }
 
-    // Método de utilidad para cargar texturas o crear una de color si falla.
+    // Método de utilidad para cargar texturas o crear una de color si falla
     private Texture loadTexture(String path, Color fallbackColor) {
-        try {
-            return new Texture(Gdx.files.internal(path));
-        } catch (Exception e) {
-            Gdx.app.error("TEXTURE_LOAD", "No se pudo cargar '" + path + "'. Usando color de fallback.", e);
-            return createColoredTexture(fallbackColor);
-        }
+        return new Texture(Gdx.files.internal(path));
     }
 
-    // Sobrecarga corregida (solo para evitar errores de compilación, aunque no se
-    // usa en el código original)
-
+    // Método para cambiar entre los estados del menú
     private void switchMenu(MenuState newState) {
-        if (!isInputEnabled)
+        if (!entradaHabilitada)
             return;
 
         // Ocultamos todas las tablas de contenido (Main, Options, Play, Solitario)
-        mainTable.setVisible(false);
-        optionsSubMenuTable.setVisible(false);
-        playSubMenuTable.setVisible(false);
-        // NO ocultamos solitarioSubMenuTable aquí si queremos que overlay trabaje bien,
-        // pero switchMenu suele limpiar todo primero.
-        solitarioSubMenuTable.setVisible(false);
+        tablaPrincipal.setVisible(false);
+        tablaSubMenuOpciones.setVisible(false);
+        tablaSubMenuJugar.setVisible(false);
+        tablaSubMenuSolitario.setVisible(false);
 
         // El título siempre está oculto
-        headerTable.setVisible(false);
+        tablaCabecera.setVisible(false);
         // El botón de salir solo se ve en el menú principal.
-        footerTable.setVisible(newState == MenuState.MAIN);
+        tablaPie.setVisible(newState == MenuState.MAIN);
 
         currentState = newState;
-        selectedIndex = 0;
+        indiceSeleccionado = 0;
 
         if (currentState == MenuState.MAIN) {
-            mainTable.setVisible(true);
-            currentButtons = mainMenuButtons;
+            tablaPrincipal.setVisible(true);
+            botonesActuales = botonesMenuPrincipal;
         } else if (currentState == MenuState.OPTIONS_SUB) {
-            optionsSubMenuTable.setVisible(true);
-            currentButtons = optionsSubMenuButtons;
+            tablaSubMenuOpciones.setVisible(true);
+            botonesActuales = botonesSubMenuOpciones;
         } else if (currentState == MenuState.PLAY_SUB) {
-            playSubMenuTable.setVisible(true);
-            currentButtons = playSubMenuButtons;
+            tablaSubMenuJugar.setVisible(true);
+            botonesActuales = botonesSubMenuJugar;
         } else if (currentState == MenuState.SOLITARIO_SUB) {
-            // "Encima de la pantalla que ya está" (PLAY_SUB)
-            playSubMenuTable.setVisible(true);
-            solitarioSubMenuTable.setVisible(true);
-            currentButtons = null; // No usamos botones estándar para solitario
+            tablaSubMenuJugar.setVisible(true);
+            tablaSubMenuSolitario.setVisible(true);
+            botonesActuales = null;
         }
 
         updateSelectionUI();
@@ -578,79 +616,78 @@ public class MenuPrincipal implements Screen, InputProcessor {
         return texture;
     }
 
+    // Actualiza la UI de la selección
     private void updateSelectionUI() {
-        if (currentState != MenuState.SOLITARIO_SUB && (currentButtons == null || currentButtons.length == 0)) {
+        if (currentState != MenuState.SOLITARIO_SUB && (botonesActuales == null || botonesActuales.length == 0)) {
             return;
         }
 
         // Resetear todos los botones a su estado normal
-        if (newGameImage != null)
-            newGameImage.setDrawable(new TextureRegionDrawable(newGameButtonTexture));
-        if (solitaireNewGameImage != null)
-            solitaireNewGameImage.setDrawable(new TextureRegionDrawable(newGameButtonTexture));
-        if (solitaireContinueGameImage != null)
-            solitaireContinueGameImage.setDrawable(new TextureRegionDrawable(continueGameButtonTexture));
-        optionsImage.setDrawable(new TextureRegionDrawable(optionsButtonTexture));
-        exitImage.setDrawable(new TextureRegionDrawable(exitButtonTexture));
+        if (imagenNuevaPartida != null)
+            imagenNuevaPartida.setDrawable(new TextureRegionDrawable(texturaBotonNuevaPartida));
+        if (imagenSolitarioNuevaPartida != null)
+            imagenSolitarioNuevaPartida.setDrawable(new TextureRegionDrawable(texturaBotonNuevaPartida));
+        if (imagenSolitarioContinuarPartida != null)
+            imagenSolitarioContinuarPartida.setDrawable(new TextureRegionDrawable(texturaBotonContinuar));
+        imagenOpciones.setDrawable(new TextureRegionDrawable(texturaBotonOpciones));
+        imagenSalir.setDrawable(new TextureRegionDrawable(texturaBotonSalir));
 
-        helpImage.setDrawable(new TextureRegionDrawable(helpButtonTexture));
-        aboutImage.setDrawable(new TextureRegionDrawable(aboutButtonTexture));
-        backOptionsImage.setDrawable(new TextureRegionDrawable(backButtonTexture));
+        imagenAyuda.setDrawable(new TextureRegionDrawable(texturaBotonAyuda));
+        imagenAcercaDe.setDrawable(new TextureRegionDrawable(texturaBotonAcercaDe));
+        imagenVolverOpciones.setDrawable(new TextureRegionDrawable(texturaBotonVolver));
 
-        singlePlayerImage.setDrawable(new TextureRegionDrawable(singlePlayerButtonTexture));
-        multiPlayerImage.setDrawable(new TextureRegionDrawable(multiPlayerButtonTexture));
-        backNewGameImage.setDrawable(new TextureRegionDrawable(backButtonTexture));
+        imagenSolitario.setDrawable(new TextureRegionDrawable(texturaBotonSolitario));
+        imagenMultijugador.setDrawable(new TextureRegionDrawable(texturaBotonMultijugador));
+        imagenVolverNuevaPartida.setDrawable(new TextureRegionDrawable(texturaBotonVolver));
 
         // Aplicar textura seleccionada al botón actual
         if (currentState == MenuState.MAIN) {
-            if (selectedIndex == 0) {
-                newGameImage.setDrawable(new TextureRegionDrawable(newGameButtonSelectedTexture));
-            } else if (selectedIndex == 1) {
-                optionsImage.setDrawable(new TextureRegionDrawable(optionsButtonSelectedTexture));
-            } else if (selectedIndex == 2) {
-                exitImage.setDrawable(new TextureRegionDrawable(exitButtonSelectedTexture));
+            if (indiceSeleccionado == 0) {
+                imagenNuevaPartida.setDrawable(new TextureRegionDrawable(texturaBotonNuevaPartidaSeleccionado));
+            } else if (indiceSeleccionado == 1) {
+                imagenOpciones.setDrawable(new TextureRegionDrawable(texturaBotonOpcionesSeleccionado));
+            } else if (indiceSeleccionado == 2) {
+                imagenSalir.setDrawable(new TextureRegionDrawable(texturaBotonSalirSeleccionado));
             }
         } else if (currentState == MenuState.OPTIONS_SUB) {
-            if (selectedIndex == 0) {
-                helpImage.setDrawable(new TextureRegionDrawable(helpButtonSelectedTexture));
-            } else if (selectedIndex == 1) {
-                aboutImage.setDrawable(new TextureRegionDrawable(aboutButtonSelectedTexture));
-            } else if (selectedIndex == 2) {
-                backOptionsImage.setDrawable(new TextureRegionDrawable(backButtonSelectedTexture));
+            if (indiceSeleccionado == 0) {
+                imagenAyuda.setDrawable(new TextureRegionDrawable(texturaBotonAyudaSeleccionado));
+            } else if (indiceSeleccionado == 1) {
+                imagenAcercaDe.setDrawable(new TextureRegionDrawable(texturaBotonAcercaDeSeleccionado));
+            } else if (indiceSeleccionado == 2) {
+                imagenVolverOpciones.setDrawable(new TextureRegionDrawable(texturaBotonVolverSeleccionado));
             }
         } else if (currentState == MenuState.PLAY_SUB) {
-            if (selectedIndex == 0) {
-                singlePlayerImage.setDrawable(new TextureRegionDrawable(singlePlayerButtonSelectedTexture));
-            } else if (selectedIndex == 1) {
-                multiPlayerImage.setDrawable(new TextureRegionDrawable(multiPlayerButtonSelectedTexture));
-            } else if (selectedIndex == 2) {
-                backNewGameImage.setDrawable(new TextureRegionDrawable(backButtonSelectedTexture));
+            if (indiceSeleccionado == 0) {
+                imagenSolitario.setDrawable(new TextureRegionDrawable(texturaBotonSolitarioSeleccionado));
+            } else if (indiceSeleccionado == 1) {
+                imagenMultijugador.setDrawable(new TextureRegionDrawable(texturaBotonMultijugadorSeleccionado));
+            } else if (indiceSeleccionado == 2) {
+                imagenVolverNuevaPartida.setDrawable(new TextureRegionDrawable(texturaBotonVolverSeleccionado));
             }
         } else if (currentState == MenuState.SOLITARIO_SUB) {
-            // Reset colors
-            solitarioNewGameLabel.setColor(Color.WHITE);
-            solitarioContinueGameLabel.setColor(Color.WHITE);
-            solitarioBackLabel.setColor(Color.WHITE);
+            etiquetaSolitarioNuevaPartida.setColor(Color.WHITE);
+            etiquetaSolitarioContinuarPartida.setColor(Color.WHITE);
+            etiquetaSolitarioVolver.setColor(Color.WHITE);
 
-            // Highlight selected
-            if (selectedIndex == 0)
-                solitarioNewGameLabel.setColor(Color.YELLOW);
-            else if (selectedIndex == 1)
-                solitarioContinueGameLabel.setColor(Color.YELLOW);
-            else if (selectedIndex == 2)
-                solitarioBackLabel.setColor(Color.YELLOW);
+            if (indiceSeleccionado == 0)
+                etiquetaSolitarioNuevaPartida.setColor(Color.YELLOW);
+            else if (indiceSeleccionado == 1)
+                etiquetaSolitarioContinuarPartida.setColor(Color.YELLOW);
+            else if (indiceSeleccionado == 2)
+                etiquetaSolitarioVolver.setColor(Color.YELLOW);
         }
 
-        // Resetear colores
-        if (currentButtons != null) {
-            for (int i = 0; i < currentButtons.length; i++) {
-                currentButtons[i].setColor(Color.WHITE);
+        if (botonesActuales != null) {
+            for (int i = 0; i < botonesActuales.length; i++) {
+                botonesActuales[i].setColor(Color.WHITE);
             }
         }
     }
 
+    // Ejecuta la acción correspondiente al botón seleccionado
     private void executeAction(int index) {
-        if (!isInputEnabled)
+        if (!entradaHabilitada)
             return;
 
         switch (currentState) {
@@ -658,66 +695,61 @@ public class MenuPrincipal implements Screen, InputProcessor {
                 switch (index) {
                     case 0:
                         switchMenu(MenuState.PLAY_SUB);
-                        break; // "Jugar"
+                        break;
                     case 1:
                         switchMenu(MenuState.OPTIONS_SUB);
-                        break; // Opciones
+                        break;
                     case 2:
                         Gdx.app.log("MENU", "Saliendo del juego...");
                         Gdx.app.exit();
-                        break; // Salir
+                        break;
                 }
                 break;
             case PLAY_SUB:
                 switch (index) {
                     case 0:
                         switchMenu(MenuState.SOLITARIO_SUB);
-                        break; // En Solitario
+                        break;
                     case 1:
-                        Gdx.app.log("MENU", "Iniciando modo Multijugador.");
-                        Gdx.input.setInputProcessor(null);
-                        game.setScreen(new ScreenMultiplayer(game));
+                        showIpDialog();
                         break;
                     case 2:
                         switchMenu(MenuState.MAIN);
-                        break; // Volver
+                        break;
                 }
                 break;
             case SOLITARIO_SUB:
-                String username = UserManager.getCurrentUser();
+                String usuarioActual = UserManager.getCurrentUser();
                 switch (index) {
-                    case 0: // Nuevo Juego
-                        if (game.hasSaveData(username)) {
+                    case 0:
+                        if (juego.hasSaveData(usuarioActual)) {
                             Gdx.app.log("MENU", "ADVERTENCIA: Se sobrescribirán los datos.");
-                            // Aquí se podría mostrar un diálogo visual, por ahora log y proceder como pide
-                            // el usuario
                         }
-                        game.clearProgress();
+                        juego.clearProgress();
                         Gdx.app.log("MENU", "Iniciando Nuevo Juego.");
                         Gdx.input.setInputProcessor(null);
-                        game.setScreen(new ScreenMapaTiled(game, null));
+                        juego.setScreen(new ScreenMapaTiled(juego, null));
                         break;
                     case 1: // Continuar Juego
-                        if (game.hasSaveData(username)) {
-                            game.loadProgress(username);
+                        if (juego.hasSaveData(usuarioActual)) {
+                            juego.loadProgress(usuarioActual);
                             Gdx.input.setInputProcessor(null);
 
-                            sodyl.proyecto.clases.PlayerData pData = game.getPlayerData();
+                            sodyl.proyecto.clases.PlayerData pData = juego.getPlayerData();
 
                             if (pData != null) {
                                 Gdx.app.log("MENU", "Continuando Partida en: " + pData.currentMap + " (" + pData.x + ","
                                         + pData.y + ")");
-                                game.setScreen(new ScreenMapaTiled(game, pData.currentMap, null, null, null,
+                                juego.setScreen(new ScreenMapaTiled(juego, pData.currentMap, null, null, null,
                                         ScreenMapaTiled.GameState.FREE_ROAMING, pData.x, pData.y));
                             } else {
-                                // Fallback if data is partial (no position data yet)
                                 Gdx.app.log("MENU", "Datos parciales encontrados. Usando inicio por defecto.");
-                                game.setScreen(new ScreenMapaTiled(game, "Mapa/MAPACOMPLETO.tmx", null, null, null,
+                                juego.setScreen(new ScreenMapaTiled(juego, "Mapa/MAPACOMPLETO.tmx", null, null, null,
                                         ScreenMapaTiled.GameState.FREE_ROAMING));
                             }
                         } else {
                             Gdx.app.log("MENU", "ERROR: No hay datos guardados.");
-                            showError("No se encontraron datos guardados para el usuario: " + username);
+                            showError("No se encontraron datos guardados para el usuario: " + usuarioActual);
                         }
                         break;
                     case 2:
@@ -729,43 +761,59 @@ public class MenuPrincipal implements Screen, InputProcessor {
                 switch (index) {
                     case 0:
                         Gdx.app.log("OPTIONS", "Ayuda.");
-                        game.setScreen(new ScreenAyuda(game));
+                        juego.setScreen(new ScreenAyuda(juego));
                         break;
                     case 1:
                         Gdx.app.log("OPTIONS", "Acerca de.");
-                        game.setScreen(new ScreenAcercaDe(game));
+                        juego.setScreen(new ScreenAcercaDe(juego));
                         break;
                     case 2:
                         switchMenu(MenuState.MAIN);
-                        break; // Volver
+                        break;
                 }
                 break;
         }
     }
 
+    // Gestiona la entrada del teclado
     @Override
     public boolean keyDown(int keycode) {
-        if (!isInputEnabled)
+        if (!entradaHabilitada)
             return false;
+
+        if (esVisibleDialogoIp) {
+            if (keycode == Keys.ESCAPE) {
+                hideIpDialog();
+                return true;
+            }
+            if (keycode == Keys.ENTER) {
+                String ip = campoTextoIp.getText();
+                if (ip == null || ip.trim().isEmpty())
+                    ip = "localhost";
+                juego.setScreen(new ScreenMultiplayer(juego, ip));
+                return true;
+            }
+            return false;
+        }
 
         int numItems = getNumItemsInCurrentMenu();
         if (numItems == 0)
             return false;
 
         if (keycode == Keys.DOWN || keycode == Keys.RIGHT) {
-            selectedIndex = (selectedIndex + 1) % numItems;
+            indiceSeleccionado = (indiceSeleccionado + 1) % numItems;
             updateSelectionUI();
             return true;
         }
 
         if (keycode == Keys.UP || keycode == Keys.LEFT) {
-            selectedIndex = (selectedIndex - 1 + numItems) % numItems;
+            indiceSeleccionado = (indiceSeleccionado - 1 + numItems) % numItems;
             updateSelectionUI();
             return true;
         }
 
         if (keycode == Keys.ENTER || keycode == Keys.Z) {
-            executeAction(selectedIndex);
+            executeAction(indiceSeleccionado);
             return true;
         }
 
@@ -777,8 +825,8 @@ public class MenuPrincipal implements Screen, InputProcessor {
                 switchMenu(MenuState.PLAY_SUB);
                 return true;
             } else if (currentState == MenuState.MAIN) {
-                if (selectedIndex != numItems - 1) {
-                    selectedIndex = numItems - 1;
+                if (indiceSeleccionado != numItems - 1) {
+                    indiceSeleccionado = numItems - 1;
                     updateSelectionUI();
                 } else {
                     Gdx.app.exit();
@@ -789,48 +837,51 @@ public class MenuPrincipal implements Screen, InputProcessor {
         return false;
     }
 
+    // Obtiene el número de elementos en el menú actual
     private int getNumItemsInCurrentMenu() {
         if (currentState == MenuState.SOLITARIO_SUB)
             return 3;
-        if (currentButtons != null)
-            return currentButtons.length;
+        if (botonesActuales != null)
+            return botonesActuales.length;
         return 0;
     }
 
+    // Renderiza el menú
     @Override
     public void render(float delta) {
         ScreenUtils.clear(0f, 0f, 0f, 1);
-        stage.act(Gdx.graphics.getDeltaTime());
-        stage.draw();
+        escenario.act(Gdx.graphics.getDeltaTime());
+        escenario.draw();
 
-        if (fadeTimer < fadeDuration) {
-            fadeTimer += delta;
+        if (temporizadorDesvanecimiento < duracionDesvanecimiento) {
+            temporizadorDesvanecimiento += delta;
 
-            float alpha = 1.0f - Math.min(1f, fadeTimer / fadeDuration);
+            float alpha = 1.0f - Math.min(1f, temporizadorDesvanecimiento / duracionDesvanecimiento);
 
             if (alpha > 0.01f) {
                 Gdx.gl.glEnable(GL20.GL_BLEND);
                 Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-                stage.getBatch().begin();
-                stage.getBatch().setColor(0, 0, 0, alpha);
-                stage.getBatch().draw(
-                        blackPixelTexture,
+                escenario.getBatch().begin();
+                escenario.getBatch().setColor(0, 0, 0, alpha);
+                escenario.getBatch().draw(
+                        texturaPixelNegro,
                         0, 0,
-                        stage.getViewport().getWorldWidth(),
-                        stage.getViewport().getWorldHeight());
-                stage.getBatch().end();
+                        escenario.getViewport().getWorldWidth(),
+                        escenario.getViewport().getWorldHeight());
+                escenario.getBatch().end();
 
-                stage.getBatch().setColor(Color.WHITE);
+                escenario.getBatch().setColor(Color.WHITE);
                 Gdx.gl.glDisable(GL20.GL_BLEND);
             }
         }
 
-        if (fadeTimer >= fadeDuration && !isInputEnabled) {
-            isInputEnabled = true;
+        if (temporizadorDesvanecimiento >= duracionDesvanecimiento && !entradaDesvanecimientoInicializada) {
+            entradaDesvanecimientoInicializada = true;
+            entradaHabilitada = true;
             InputMultiplexer multiplexer = new InputMultiplexer();
             multiplexer.addProcessor(this); // Para teclado (flechas/enter)
-            multiplexer.addProcessor(stage); // Para clicks (botones)
+            multiplexer.addProcessor(escenario); // Para clicks
             Gdx.input.setInputProcessor(multiplexer);
         }
     }
@@ -842,7 +893,7 @@ public class MenuPrincipal implements Screen, InputProcessor {
 
     @Override
     public void resize(int width, int height) {
-        stage.getViewport().update(width, height, true);
+        escenario.getViewport().update(width, height, true);
         updateSelectionUI();
     }
 
@@ -861,57 +912,54 @@ public class MenuPrincipal implements Screen, InputProcessor {
 
     @Override
     public void dispose() {
-        stage.dispose();
-        font.dispose();
-        backgroundTexture.dispose();
-        titleTexture.dispose();
+        escenario.dispose();
+        fuente.dispose();
+        texturaFondo.dispose();
+        texturaTitulo.dispose();
 
-        // Disponer todas las texturas nuevas y antiguas
-        if (newGameButtonTexture != null)
-            newGameButtonTexture.dispose();
-        if (continueGameButtonTexture != null)
-            continueGameButtonTexture.dispose();
-        if (optionsButtonTexture != null)
-            optionsButtonTexture.dispose();
-        if (exitButtonTexture != null)
-            exitButtonTexture.dispose();
-        if (helpButtonTexture != null)
-            helpButtonTexture.dispose();
-        if (aboutButtonTexture != null)
-            aboutButtonTexture.dispose();
-        if (backButtonTexture != null)
-            backButtonTexture.dispose();
-        if (singlePlayerButtonTexture != null)
-            singlePlayerButtonTexture.dispose();
-        if (multiPlayerButtonTexture != null)
-            multiPlayerButtonTexture.dispose();
+        if (texturaBotonNuevaPartida != null)
+            texturaBotonNuevaPartida.dispose();
+        if (texturaBotonContinuar != null)
+            texturaBotonContinuar.dispose();
+        if (texturaBotonOpciones != null)
+            texturaBotonOpciones.dispose();
+        if (texturaBotonSalir != null)
+            texturaBotonSalir.dispose();
+        if (texturaBotonAyuda != null)
+            texturaBotonAyuda.dispose();
+        if (texturaBotonAcercaDe != null)
+            texturaBotonAcercaDe.dispose();
+        if (texturaBotonVolver != null)
+            texturaBotonVolver.dispose();
+        if (texturaBotonSolitario != null)
+            texturaBotonSolitario.dispose();
+        if (texturaBotonMultijugador != null)
+            texturaBotonMultijugador.dispose();
 
-        if (buttonDownTexture != null)
-            buttonDownTexture.dispose();
-        if (blackPixelTexture != null)
-            blackPixelTexture.dispose();
+        if (texturaBotonPresionado != null)
+            texturaBotonPresionado.dispose();
+        if (texturaPixelNegro != null)
+            texturaPixelNegro.dispose();
 
-        // Disponer texturas seleccionadas
-        if (newGameButtonSelectedTexture != null)
-            newGameButtonSelectedTexture.dispose();
-        if (continueGameButtonSelectedTexture != null)
-            continueGameButtonSelectedTexture.dispose();
-        if (optionsButtonSelectedTexture != null)
-            optionsButtonSelectedTexture.dispose();
-        if (exitButtonSelectedTexture != null)
-            exitButtonSelectedTexture.dispose();
+        if (texturaBotonNuevaPartidaSeleccionado != null)
+            texturaBotonNuevaPartidaSeleccionado.dispose();
+        if (texturaBotonContinuarSeleccionado != null)
+            texturaBotonContinuarSeleccionado.dispose();
+        if (texturaBotonOpcionesSeleccionado != null)
+            texturaBotonOpcionesSeleccionado.dispose();
+        if (texturaBotonSalirSeleccionado != null)
+            texturaBotonSalirSeleccionado.dispose();
 
-        // Disponer texturas seleccionadas de sub-menús
-        if (helpButtonSelectedTexture != null)
-            helpButtonSelectedTexture.dispose();
-        if (aboutButtonSelectedTexture != null)
-            aboutButtonSelectedTexture.dispose();
-        if (backButtonSelectedTexture != null)
-            backButtonSelectedTexture.dispose();
-        if (singlePlayerButtonSelectedTexture != null)
-            singlePlayerButtonSelectedTexture.dispose();
-        if (multiPlayerButtonSelectedTexture != null)
-            multiPlayerButtonSelectedTexture.dispose();
+        if (texturaBotonAyudaSeleccionado != null)
+            texturaBotonAyudaSeleccionado.dispose();
+        if (texturaBotonAcercaDeSeleccionado != null)
+            texturaBotonAcercaDeSeleccionado.dispose();
+        if (texturaBotonVolverSeleccionado != null)
+            texturaBotonVolverSeleccionado.dispose();
+        if (texturaBotonSolitarioSeleccionado != null)
+            texturaBotonSolitarioSeleccionado.dispose();
+        if (texturaBotonMultijugadorSeleccionado != null)
+            texturaBotonMultijugadorSeleccionado.dispose();
     }
 
     @Override
@@ -950,17 +998,38 @@ public class MenuPrincipal implements Screen, InputProcessor {
     }
 
     private void showError(String message) {
-        if (errorLabel != null && errorTable != null) {
-            errorLabel.setText(message);
-            errorTable.setVisible(true);
-            errorTable.toFront();
+        if (etiquetaError != null && tablaError != null) {
+            etiquetaError.setText(message);
+            tablaError.setVisible(true);
+            tablaError.toFront();
         } else {
-            Gdx.app.log("MENU", "Error al mostrar mensaje visual (componentes nulos): " + message);
+            Gdx.app.log("MENU", "Error al mostrar mensaje visual: " + message);
         }
     }
 
     private void closeError() {
-        if (errorTable != null)
-            errorTable.setVisible(false);
+        if (tablaError != null)
+            tablaError.setVisible(false);
+    }
+
+    // --- IP Dialog Helpers ---
+    private void showIpDialog() {
+        if (tablaDialogoIp != null) {
+            tablaDialogoIp.setVisible(true);
+            esVisibleDialogoIp = true;
+            // Focus on text field
+            escenario.setKeyboardFocus(campoTextoIp);
+            if (campoTextoIp != null) {
+                campoTextoIp.selectAll();
+            }
+        }
+    }
+
+    private void hideIpDialog() {
+        if (tablaDialogoIp != null) {
+            tablaDialogoIp.setVisible(false);
+        }
+        esVisibleDialogoIp = false;
+        escenario.setKeyboardFocus(null);
     }
 }

@@ -25,12 +25,12 @@
 			"PP": 25,
 			"precision": 100
 		},
-		"nivel": 4,
-		"actualHP": 65,
-		"maxHp": 110,
-		"danoAtaque": 78,
-		"danoDefensa": 63,
-		"velocidad": 18,
+		"nivel": 2,
+		"actualHP": 80,
+		"maxHp": 80,
+		"danoAtaque": 74,
+		"danoDefensa": 59,
+		"velocidad": 14,
 		"ppM1": 15,
 		"ppM2": 25,
 		"spriteFront": "gifPokemones/rowletAM2.gif",
@@ -39,7 +39,7 @@
 ],
 "researchLevels": {
 	"class": "java.util.HashMap",
-	"Rowlet": 4
+	"Rowlet": 3
 },
 "team": [
 	{

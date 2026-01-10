@@ -23,6 +23,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
+//Clase que implementa la pantalla de "Acerca De"
 public class ScreenAcercaDe implements Screen, InputProcessor {
 
     private final Proyecto game;
@@ -39,6 +40,7 @@ public class ScreenAcercaDe implements Screen, InputProcessor {
 
     @Override
     public void show() {
+        game.playMusic("musica/jumpUp.mp3");
         stage = new Stage(new FitViewport(Proyecto.PANTALLA_W, Proyecto.PANTALLA_H));
 
         InputMultiplexer multiplexer = new InputMultiplexer();
@@ -46,13 +48,13 @@ public class ScreenAcercaDe implements Screen, InputProcessor {
         multiplexer.addProcessor(this);
         Gdx.input.setInputProcessor(multiplexer);
 
-        // Background
+        // Fondo
         backgroundTexture = new Texture(Gdx.files.internal("imagenes/pantallaCarga.jpg"));
         Image bgImage = new Image(backgroundTexture);
         bgImage.setFillParent(true);
         stage.addActor(bgImage);
 
-        // Shadow Overlay for contrast
+        // Overlay para contraste
         com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1,
                 com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
         pixmap.setColor(new Color(0, 0, 0, 0.6f));
@@ -95,28 +97,27 @@ public class ScreenAcercaDe implements Screen, InputProcessor {
 
         TextButtonStyle btnStyle = new TextButtonStyle();
         btnStyle.font = fontText;
-        // Modificado para aspecto "seleccionado"
-        btnStyle.fontColor = Color.YELLOW; // Botón "Volver" amarillo
+        btnStyle.fontColor = Color.YELLOW;
         btnStyle.downFontColor = Color.RED;
         btnStyle.overFontColor = Color.YELLOW;
 
-        // Content Table
+        // Tabla principal
         Table mainTable = new Table();
         mainTable.setFillParent(true);
         mainTable.pad(20);
 
-        // Title
+        // Titulo
         Label titleLabel = new Label("ACERCA DE", titleStyle);
         mainTable.add(titleLabel).padBottom(40).row();
 
-        // Game Info
+        // Informacion del juego
         Label gameNameLabel = new Label("Pokemón Legends: Arceus", textStyle);
         mainTable.add(gameNameLabel).padBottom(10).row();
 
         Label versionLabel = new Label("Versión 1.0", creditsStyle);
         mainTable.add(versionLabel).padBottom(50).row();
 
-        // Developers
+        // Nosotros
         Label devTitleLabel = new Label("Desarrollado por:", textStyle);
         devTitleLabel.setColor(Color.ORANGE);
         mainTable.add(devTitleLabel).padBottom(20).row();
@@ -126,12 +127,12 @@ public class ScreenAcercaDe implements Screen, InputProcessor {
         devsLabel.setAlignment(Align.center);
         mainTable.add(devsLabel).padBottom(50).row();
 
-        // Rights / Additional Info
+        // Lenguaje Usado
         Label rightsLabel = new Label("Hecho con LibGDX implementado en Java", creditsStyle);
         rightsLabel.setFontScale(0.8f);
         mainTable.add(rightsLabel).padBottom(20).row();
 
-        // Back Button
+        // Boton de volver
         TextButton backButton = new TextButton("VOLVER", btnStyle);
         backButton.addListener(new ChangeListener() {
             @Override

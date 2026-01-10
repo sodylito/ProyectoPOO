@@ -56,14 +56,6 @@ public class Batalla {
      * @return true si el jugador ataca primero
      */
     public boolean playerAttacksFirst(int movimientoJugadorNum, int movimientoEnemigoNum) {
-        TiposAtaque mJ = (movimientoJugadorNum == 1) ? pokemonJugador.getMovimiento1()
-                : pokemonJugador.getMovimiento2();
-        TiposAtaque mE = (movimientoEnemigoNum == 1) ? pokemonEnemigo.getMovimiento1()
-                : pokemonEnemigo.getMovimiento2();
-
-        if (mJ.prioridad != mE.prioridad) {
-            return mJ.prioridad > mE.prioridad;
-        }
         return pokemonJugador.getVelocidad() >= pokemonEnemigo.getVelocidad();
     }
 
@@ -125,16 +117,8 @@ public class Batalla {
             return pokemonJugador.getEspecie() + " no puede usar " + movimientoJugador.nombre + ". ¡No quedan PP!";
         }
 
-        // Determinar orden por prioridad y luego por velocidad
-        int prioridadJugador = movimientoJugador.prioridad;
-        int prioridadEnemigo = movimientoEnemigo.prioridad;
-
-        boolean jugadorAtacaPrimero;
-        if (prioridadJugador != prioridadEnemigo) {
-            jugadorAtacaPrimero = prioridadJugador > prioridadEnemigo;
-        } else {
-            jugadorAtacaPrimero = pokemonJugador.getVelocidad() >= pokemonEnemigo.getVelocidad();
-        }
+        // Determinar orden por velocidad
+        boolean jugadorAtacaPrimero = pokemonJugador.getVelocidad() >= pokemonEnemigo.getVelocidad();
 
         StringBuilder sb = new StringBuilder();
 
@@ -261,14 +245,6 @@ public class Batalla {
 
         StringBuilder salida = new StringBuilder();
         salida.append(atacante.getEspecie()).append(" usó ").append(movimiento.nombre).append("!");
-
-        // 1) Chequeo de precisión
-        int precision = movimiento.precision; // 0-100
-        int roll = random.nextInt(100) + 1; // 1..100
-        if (roll > precision) {
-            salida.append("\n¡El ataque falló!");
-            return salida.toString();
-        }
 
         // 2) Fórmula de daño solicitada
         int nivel = atacante.getNivel();

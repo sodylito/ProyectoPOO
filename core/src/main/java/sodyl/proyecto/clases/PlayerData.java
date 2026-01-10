@@ -1,15 +1,12 @@
 package sodyl.proyecto.clases;
 
-/**
- * Clase simple para serializar los datos del jugador (posición y mapa).
- */
+//Clase que almacena los datos del jugador
 public class PlayerData {
     public String currentMap;
     public float x;
     public float y;
     public long lastPlayed;
 
-    // Default constructor for JSON
     public PlayerData() {
     }
 

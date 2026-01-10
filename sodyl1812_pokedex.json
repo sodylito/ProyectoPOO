@@ -1,76 +1,11 @@
 {
 "seen": {
 	"class": "java.util.HashSet",
-	"items": [
-		"Rowlet"
-	]
+	"items": []
 },
-"collected": [
-	{
-		"especie": "Rowlet",
-		"tipo": "PLANTA",
-		"baseHP": 50,
-		"growthHP": 15,
-		"movimiento1": {
-			"nombre": "Burbuja",
-			"tipo": "HADA",
-			"danoBase": 70,
-			"PP": 15,
-			"precision": 100
-		},
-		"movimiento2": {
-			"nombre": "Bomba Seta",
-			"tipo": "PLANTA",
-			"danoBase": 55,
-			"PP": 25,
-			"precision": 100
-		},
-		"nivel": 2,
-		"actualHP": 65,
-		"maxHp": 80,
-		"danoAtaque": 74,
-		"danoDefensa": 59,
-		"velocidad": 14,
-		"ppM1": 15,
-		"ppM2": 25,
-		"spriteFront": "gifPokemones/rowletAM2.gif",
-		"spriteBack": "gifPokemones/rowletAM.gif"
-	}
-],
+"collected": [],
 "researchLevels": {
-	"class": "java.util.HashMap",
-	"Rowlet": 2
+	"class": "java.util.HashMap"
 },
-"team": [
-	{
-		"especie": "Rowlet",
-		"tipo": "PLANTA",
-		"baseHP": 50,
-		"growthHP": 15,
-		"movimiento1": {
-			"nombre": "Burbuja",
-			"tipo": "HADA",
-			"danoBase": 70,
-			"PP": 15,
-			"precision": 100
-		},
-		"movimiento2": {
-			"nombre": "Bomba Seta",
-			"tipo": "PLANTA",
-			"danoBase": 55,
-			"PP": 25,
-			"precision": 100
-		},
-		"nivel": 2,
-		"actualHP": 65,
-		"maxHp": 80,
-		"danoAtaque": 74,
-		"danoDefensa": 59,
-		"velocidad": 14,
-		"ppM1": 15,
-		"ppM2": 25,
-		"spriteFront": "gifPokemones/rowletAM2.gif",
-		"spriteBack": "gifPokemones/rowletAM.gif"
-	}
-]
+"team": []
 }

@@ -38,7 +38,7 @@ public class ScreenLogin implements Screen {
     private TextField passField;
     private Label statusLabel;
 
-    // Texturas para estilos generados dinámicamente
+    // TEXTURAS PARA ESTILOS GENERADOS DINÁMICAMENTE
     private Texture fieldBgTexture;
     private Texture cursorTexture;
     private Texture selectionTexture;
@@ -49,17 +49,13 @@ public class ScreenLogin implements Screen {
     }
 
     @Override
-    public void show() {
+    public void show() { // CONFIGURACIÓN DE LA PANTALLA
+        game.playMusic("musica/jumpUp.mp3");
         stage = new Stage(new FitViewport(Proyecto.PANTALLA_W, Proyecto.PANTALLA_H));
         Gdx.input.setInputProcessor(stage);
 
-        // Background (reusamos uno existente)
-        try {
-            backgroundTexture = new Texture(Gdx.files.internal("imagenes/fondoMenu.png"));
-        } catch (Exception e) {
-            backgroundTexture = new Texture(Gdx.files.internal("imagenes/fondooo.png"));
-        }
-
+        // Background
+        backgroundTexture = new Texture(Gdx.files.internal("imagenes/fondooo.png"));
         Image bgImage = new Image(backgroundTexture);
         bgImage.setFillParent(true);
         stage.addActor(bgImage);

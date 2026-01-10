@@ -80,17 +80,19 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     protected OrthographicCamera camera;
 
     // --- NETWORKING ---
-    private ConexionCliente conexion;
-    private boolean isMultiplayer = false;
-    private Map<String, OtherPlayer> otherPlayers = new HashMap<>();
-    private float syncTimer = 0;
-    private static final float SYNC_INTERVAL = 0.05f; // Enviar posición cada 50ms
+    protected ConexionCliente conexion;
+    protected boolean isMultiplayer = false;
+    protected Map<String, OtherPlayer> otherPlayers = new HashMap<>();
+    protected float syncTimer = 0;
+    protected static final float SYNC_INTERVAL = 0.05f; // Enviar posición cada 50ms
 
     // Inner class to represent other players in the game
-    private class OtherPlayer {
-        Image actor;
+    protected class OtherPlayer {
+        public Image actor;
+        public String id;
 
         public OtherPlayer(String id, float x, float y, Direction direction, boolean isMoving) {
+            this.id = id;
             // Create actor for this player
             TextureRegion frame = walkDownAnimation.getKeyFrame(0);
             this.actor = new Image(frame);
@@ -751,6 +753,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     @Override
     public void show() {
+        if (mapPath.contains("Centro Pokemon interior")) {
+            game.playMusic("musica/rosalina.mp3");
+        } else {
+            game.playMusic("musica/mainMusic.mp3");
+        }
+
         // Si ya estamos inicializados y solo volvemos de una batalla, no reinicializar
         // todo
         if (batch != null && stage != null && camera != null && renderer != null) {
@@ -3574,22 +3582,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         nextY = Math.max(0, Math.min(nextY, mapHeight - playerHeight));
 
         characterActor.setPosition(nextX, nextY);
-
-        // --- SYNC POSITION ---
-        if (isMultiplayer && conexion != null && conexion.isConectado()) {
-            syncTimer += delta;
-            if (syncTimer >= SYNC_INTERVAL) {
-                Map<String, Object> data = new HashMap<>();
-                data.put("tipo", "mover");
-                data.put("id", sodyl.proyecto.clases.UserManager.getCurrentUser());
-                data.put("x", nextX);
-                data.put("y", nextY);
-                data.put("dir", lastDirection.name());
-                data.put("moving", isMoving);
-                conexion.enviar(data);
-                syncTimer = 0;
-            }
-        }
 
         int tileX = (int) ((nextX + playerWidth / 2) / (tileWidth * UNIT_SCALE));
         int tileY = (int) ((nextY + playerHeight / 2) / (tileHeight * UNIT_SCALE));

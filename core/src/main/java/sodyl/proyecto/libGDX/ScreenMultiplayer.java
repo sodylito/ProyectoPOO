@@ -16,19 +16,17 @@ import java.util.UUID;
 
 public class ScreenMultiplayer extends ScreenMapaTiled {
 
-    private ConexionCliente conexion;
-    private Map<String, OtherPlayer> otherPlayers = new HashMap<>();
     private float syncTimer = 0;
     private static final float SYNC_INTERVAL = 0.05f;
     private String sessionID;
+    private String serverIP;
 
-    public ScreenMultiplayer(Proyecto game) {
+    public ScreenMultiplayer(Proyecto game, String serverIP) {
         super(game, "Mapa/MAPACOMPLETO.tmx", null, null, null, GameState.FREE_ROAMING);
-        // Generate a unique session ID for this instance to avoid self-collision when
-        // testing on same account/machine
-        // Format: Username_UUID
+        this.serverIP = serverIP;
+        this.isMultiplayer = true;
+
         String username = UserManager.getCurrentUser();
-        // Fallback if no user
         if (username == null)
             username = "Guest";
 
@@ -39,8 +37,7 @@ public class ScreenMultiplayer extends ScreenMapaTiled {
     }
 
     private void initNetworking() {
-        String serverIP = "localhost"; // Could be configurable
-        conexion = new ConexionCliente(serverIP, 5000, message -> {
+        conexion = new ConexionCliente(this.serverIP, 5000, message -> {
             Gdx.app.postRunnable(() -> handleNetworkMessage(message));
         });
         conexion.conectar();
@@ -85,7 +82,22 @@ public class ScreenMultiplayer extends ScreenMapaTiled {
                         this.random.setSeed(seed);
                     }
 
-                    // 2. Refresh Collectibles
+                    // 2. Spawn Existing Players
+                    JsonValue players = root.get("players");
+                    if (players != null) {
+                        for (JsonValue p : players) {
+                            String pId = p.getString("id");
+                            if (!pId.equals(this.sessionID) && !otherPlayers.containsKey(pId)) {
+                                float pX = p.getFloat("x");
+                                float pY = p.getFloat("y");
+                                Direction pDir = Direction.valueOf(p.getString("dir"));
+                                boolean pMoving = p.getBoolean("moving");
+                                otherPlayers.put(pId, new OtherPlayer(pId, pX, pY, pDir, pMoving));
+                            }
+                        }
+                    }
+
+                    // 3. Refresh Collectibles
                     if (this.collectibles != null) {
                         // Remove existing actors
                         for (Collectible c : this.collectibles) {
@@ -156,88 +168,6 @@ public class ScreenMultiplayer extends ScreenMapaTiled {
         super.dispose();
         if (conexion != null) {
             conexion.desconectar();
-        }
-    }
-
-    // Inner class for other players (copied/adapted from base class but managed
-    // here)
-    private class OtherPlayer {
-        Image actor;
-        String id;
-
-        public OtherPlayer(String id, float x, float y, Direction direction, boolean isMoving) {
-            this.id = id;
-            // Need to verify if 'walkDownAnimation' is initialized in base class before we
-            // use it?
-            // Base class initialization happens in show(). We call super.show() implicitly
-            // via game.setScreen?
-            // Actually Constructor calls this(), which sets map and state. show() is called
-            // by Game.
-            // We need to ensure assets are loaded. Base class show() initializes them.
-            // If OtherPlayer is created before show(), we crash.
-            // Network runs on thread, posts to runnable.
-            // Ideally safe.
-
-            TextureRegion frame = walkDownAnimation.getKeyFrame(0);
-            this.actor = new Image(frame);
-            this.actor.setSize(2f, 2f); // Assuming 2x2 scale as in base class?
-            // In base class: this.actor.setSize(2f, 2f); // It was using constants or
-            // hardcoded.
-            // Let's stick to what was there.
-
-            this.actor.setPosition(x, y);
-
-            // Add to the STAGE of the base class.
-            stage.addActor(this.actor);
-        }
-
-        public void update(float x, float y, Direction direction, boolean isMoving) {
-            this.actor.setPosition(x, y);
-            TextureRegion currentFrame = null;
-
-            if (isMoving) {
-                switch (direction) {
-                    case UP:
-                        currentFrame = walkUpAnimation.getKeyFrame(stateTime, true);
-                        break;
-                    case DOWN:
-                        currentFrame = walkDownAnimation.getKeyFrame(stateTime, true);
-                        break;
-                    case LEFT:
-                        currentFrame = walkLeftAnimation.getKeyFrame(stateTime, true);
-                        break;
-                    case RIGHT:
-                        currentFrame = walkRightAnimation.getKeyFrame(stateTime, true);
-                        break;
-                    default:
-                        currentFrame = walkDownAnimation.getKeyFrame(stateTime, true);
-                        break;
-                }
-            } else {
-                switch (direction) {
-                    case UP:
-                        currentFrame = walkUpAnimation.getKeyFrame(0);
-                        break;
-                    case DOWN:
-                        currentFrame = walkDownAnimation.getKeyFrame(0);
-                        break;
-                    case LEFT:
-                        currentFrame = walkLeftAnimation.getKeyFrame(0);
-                        break;
-                    case RIGHT:
-                        currentFrame = walkRightAnimation.getKeyFrame(0);
-                        break;
-                    default:
-                        currentFrame = walkDownAnimation.getKeyFrame(0);
-                        break;
-                }
-            }
-            this.actor.setDrawable(new TextureRegionDrawable(currentFrame));
-        }
-
-        public void remove() {
-            if (actor != null)
-                actor.remove();
         }
     }
 }

@@ -193,6 +193,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
     @Override
     public void show() {
+        game.playMusic("musica/batallaMusic.mp3");
         batch = new SpriteBatch();
         // Cargar fuente personalizada "Donuts Chocolate"
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(
