@@ -37,10 +37,10 @@ public class ScreenMultiplayer implements Screen {
 
     @Override
     public void show() {
-        stage = new Stage(new FitViewport(800, 600)); // Ajustar viewport según necesidad
+        stage = new Stage(new FitViewport(800, 600));
         Gdx.input.setInputProcessor(stage);
 
-        Skin skin = new Skin(Gdx.files.internal("uiskin.json")); // Asumiendo que existe un skin básico
+        Skin skin = new Skin(Gdx.files.internal("uiskin.json"));
 
         Table table = new Table();
         table.setFillParent(true);
@@ -80,11 +80,6 @@ public class ScreenMultiplayer implements Screen {
     }
 
     private void handleMessage(String message) {
-        // Parsear mensajes simples del servidor para lobby
-        // El servidor debería enviar stats de jugadores, etc.
-        // Por ahora, si recibimos "START_GAME", iniciamos.
-
-        // Simple JSON parse attempt
         try {
             if (message.contains("START_GAME")) {
                 JsonValue root = new JsonReader().parse(message);
@@ -105,15 +100,6 @@ public class ScreenMultiplayer implements Screen {
         if (gameStarted)
             return;
         gameStarted = true;
-
-        // IMPORTANTE: Pasamos la conexión o flag al Mapa
-        // ScreenMapaTiled manejará la conexión "in-game"
-        // Pero idealmente reutilizamos la conexión o la cerramos y el mapa abre la
-        // suya.
-        // Dado el código actual de ScreenMapaTiled, abre su propia conexión en
-        // constructor.
-        // Así que cerramos esta.
-
         client.desconectar();
 
         Gdx.app.postRunnable(() -> {
@@ -137,7 +123,6 @@ public class ScreenMultiplayer implements Screen {
 
         if (client != null && !client.isConectado() && isConnecting) {
             statusLabel.setText("Error de conexión. Reintentando...");
-            // Simple reintento o mensaje de error
         }
     }
 

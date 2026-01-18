@@ -23,7 +23,7 @@ public class PlayerNetworkManager implements ConexionCliente.MessageListener {
     private final Map<String, PlayerState> remotePlayers = new HashMap<>();
 
     private float lastSendTime = 0f;
-    private float sendInterval = 0.1f; // 10 veces por segundo
+    private float sendInterval = 0.1f;
 
     public PlayerNetworkManager(ConexionCliente conexion, String myId, RemotePlayerListener listener) {
         this.conexion = conexion;
@@ -31,10 +31,6 @@ public class PlayerNetworkManager implements ConexionCliente.MessageListener {
         this.listener = listener;
     }
 
-    /**
-     * Llamar desde tu update(delta) del juego, pasando la posición actual del
-     * jugador local.
-     */
     public void update(float delta, float myX, float myY) {
         lastSendTime += delta;
         if (lastSendTime >= sendInterval && conexion.isConectado()) {
@@ -73,7 +69,7 @@ public class PlayerNetworkManager implements ConexionCliente.MessageListener {
             if (tipo.equals("player_update") || tipo.equals("player_join")) {
                 String id = root.getString("id", null);
                 if (id == null || id.equals(myId))
-                    return; // ignorar mi propio mensaje
+                    return;
 
                 float x = root.getFloat("x", 0f);
                 float y = root.getFloat("y", 0f);
@@ -99,7 +95,6 @@ public class PlayerNetworkManager implements ConexionCliente.MessageListener {
                 }
             }
 
-            // Aquí puedes seguir procesando otros tipos: duelos, items, etc.
         } catch (Exception e) {
             Gdx.app.error("NETWORK", "Error procesando mensaje: " + message + " -> " + e.getMessage());
         }

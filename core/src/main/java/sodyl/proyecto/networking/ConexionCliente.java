@@ -38,8 +38,6 @@ public class ConexionCliente {
         new Thread(() -> {
             try {
                 Gdx.app.log("NETWORK", "Intentando conectar a " + servidorIP + ":" + puerto);
-                // Si es localhost, usamos la IP de loopback explícita para evitar problemas de
-                // resolución
                 if (servidorIP.equals("localhost")) {
                     socket = new Socket(InetAddress.getByName("127.0.0.1"), puerto);
                 } else {
@@ -51,7 +49,6 @@ public class ConexionCliente {
                 conectado = true;
                 Gdx.app.log("NETWORK", "Conectado al servidor!");
 
-                // Iniciar hilo de escucha
                 startListening();
 
             } catch (IOException e) {
@@ -71,7 +68,7 @@ public class ConexionCliente {
                     }
                 }
             } catch (IOException e) {
-                if (conectado) { // Solo loguear error si no fue una desconexión intencional
+                if (conectado) {
                     Gdx.app.error("NETWORK", "Error leyendo del servidor: " + e.getMessage());
                 }
             } finally {

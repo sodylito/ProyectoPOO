@@ -102,8 +102,8 @@ public class SeleccionPokemon implements Screen, InputProcessor {
 
         // Estilos de las etiquetas
         LabelStyle labelStyle = new LabelStyle(labelFont, Color.WHITE);
-        LabelStyle titleStyle = new LabelStyle(titleFont, new Color(1f, 0.9f, 0.2f, 1f)); // Golden yellow
-        LabelStyle instructionStyle = new LabelStyle(font, new Color(0.8f, 0.8f, 1f, 1f)); // Light blue
+        LabelStyle titleStyle = new LabelStyle(titleFont, new Color(1f, 0.9f, 0.2f, 1f));
+        LabelStyle instructionStyle = new LabelStyle(font, new Color(0.8f, 0.8f, 1f, 1f));
 
         // Tabla principal (Layout)
         mainTable = new Table();
@@ -122,7 +122,7 @@ public class SeleccionPokemon implements Screen, InputProcessor {
         mainTable.add(selectedNameLabel).padBottom(20).row();
 
         selectionConfirmationLabel = new Label("Presiona ENTER para confirmar", instructionStyle);
-        selectionConfirmationLabel.setColor(0.4f, 1f, 0.4f, 0f); // Bright green, start transparent
+        selectionConfirmationLabel.setColor(0.4f, 1f, 0.4f, 0f);
         selectionConfirmationLabel.addAction(Actions.sequence(Actions.delay(0.5f), Actions.fadeIn(0.6f)));
         mainTable.add(selectionConfirmationLabel).padBottom(50).row();
 
@@ -145,7 +145,7 @@ public class SeleccionPokemon implements Screen, InputProcessor {
         mainTable.add(selectionTable).padTop(20).row();
 
         instructionLabel = new Label("Usa las flechas ← → o el mouse para elegir", instructionStyle);
-        instructionLabel.setColor(0.8f, 0.8f, 1f, 0f); // Start transparent
+        instructionLabel.setColor(0.8f, 0.8f, 1f, 0f);
         instructionLabel.addAction(Actions.sequence(Actions.delay(0.7f), Actions.fadeIn(0.7f)));
         mainTable.add(instructionLabel).padTop(50).row();
         updateSelectionUI();
