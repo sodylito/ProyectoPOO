@@ -1,6 +1,7 @@
 package sodyl.proyecto.libGDX;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
@@ -65,7 +66,7 @@ import java.util.HashSet;
 import java.util.Arrays;
 import static com.badlogic.gdx.Input.Keys;
 
-//CLASE QUE MANEJA EL JUEGO
+// Clase principal que maneja la lógica del mapa, el movimiento del jugador y la interacción multijugador
 public class ScreenMapaTiled implements Screen, InputProcessor {
 
     protected final Proyecto game; // Instancia de la clase Proyecto
@@ -84,16 +85,15 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     protected Long multiplayerSeed = null;
     private String serverIP = "localhost";
 
+    // Representa a otros jugadores conectados en el mundo multijugador
     public class OtherPlayer {
         public Image actor;
         public String id;
 
         public OtherPlayer(String id, float x, float y, Direction direction, boolean isMoving) {
             this.id = id;
-            // Create actor for this player (asegurar que animaciones existen)
             TextureRegion frame = (walkDownAnimation != null) ? walkDownAnimation.getKeyFrame(0) : null;
             if (frame == null) {
-                // Fallback texture if animation not loaded yet
                 Pixmap pixmap = new Pixmap(32, 32, Pixmap.Format.RGBA8888);
                 pixmap.setColor(Color.CYAN);
                 pixmap.fill();
@@ -105,7 +105,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             this.actor.setSize(2f, 2f);
             this.actor.setPosition(x, y);
 
-            // Solo añadir al stage si ya existe
             if (stage != null) {
                 stage.addActor(this.actor);
                 Gdx.app.log("MULTI", "OtherPlayer added to stage: " + id + " at " + x + "," + y);
@@ -119,7 +118,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             TextureRegion currentFrame = null;
 
             if (isMoving) {
-                // UNIDAD 3: POLIMORFISMO DE SUBTIPOS Y ENUMERACIONES
                 switch (direction) {
                     case UP:
                         currentFrame = (walkUpAnimation != null) ? walkUpAnimation.getKeyFrame(stateTime, true) : null;
@@ -172,7 +170,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
     }
 
-    // Método público para actualizar jugadores desde ScreenMultiplayer
+    // Actualiza o crea la representación visual de otro jugador basado en los datos
+    // de la red
     public void updateOtherPlayer(String id, float x, float y, String dirStr, boolean moving) {
         Gdx.app.log("MULTI", "Actualizando jugador " + id + " a " + x + "," + y + " dir=" + dirStr + " move=" + moving);
         Direction dir = Direction.DOWN;
@@ -188,6 +187,21 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             otherPlayers.put(id, nuevo);
         } else {
             otherPlayers.get(id).update(x, y, dir, moving);
+        }
+    }
+
+    // Envía la posición y dirección actual del jugador local al servidor
+    private void sendMovementUpdate(float x, float y, String dir, boolean moving) {
+        String msg = "{"
+                + "\"tipo\":\"mover\","
+                + "\"id\":\"" + sodyl.proyecto.clases.UserManager.getCurrentUser() + "\","
+                + "\"x\":" + x + ","
+                + "\"y\":" + y + ","
+                + "\"dir\":\"" + dir + "\","
+                + "\"moving\":" + moving
+                + "}";
+        if (conexion != null) {
+            conexion.enviarMensaje(msg);
         }
     }
 
@@ -226,25 +240,22 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private static final String COLLISION_LAYER_NAME = "Capa de Objetos 1";
     private static final float COLLISION_PADDING = 0.1f;
 
-    // --- SISTEMA DE ENCUENTROS ---
     private Array<EncounterZone> encounterZones;
 
-    public Pokemon playerPokemon; // Pokémon del jugador (public para acceso desde ScreenBatalla)
-    public boolean canTriggerEncounter = true; // Evita múltiples encuentros seguidos (public para acceso desde
-                                               // ScreenBatalla)
-    public float encounterCooldown = 0f; // (public para acceso desde ScreenBatalla)
-    private final float ENCOUNTER_COOLDOWN_TIME = 3.0f; // Segundos entre encuentros
+    public Pokemon playerPokemon;
+    public boolean canTriggerEncounter = true;
+    public float encounterCooldown = 0f;
+    private final float ENCOUNTER_COOLDOWN_TIME = 3.0f;
 
     private final float PLAYER_START_X = 11f;
     private final float PLAYER_START_Y = 38f;
 
-    // Custom spawn position (used when returning from Pokemon Center)
     private Float customSpawnX = null;
     private Float customSpawnY = null;
 
     private BitmapFont font;
 
-    public enum GameState { // Se hace public para usar en otras clases si es necesario
+    public enum GameState {
         FREE_ROAMING,
         PAUSED,
         DIALOGUE,
@@ -267,11 +278,11 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private float arceusMarkerTimer = 0f;
     private com.badlogic.gdx.graphics.glutils.ShapeRenderer shapeRenderer;
 
-    public GameState currentState; // public para acceso desde ScreenBatalla
+    public GameState currentState;
 
     private DialogBox dialogBox;
     private Queue<String> dialogueQueue = new LinkedList<>();
-    private Pokemon pendingEnemyForBattle; // enemigo pendiente a iniciar cuando el diálogo termine
+    private Pokemon pendingEnemyForBattle;
     private final String[] initialDialogs = {
             "¡Hijo hijo hijo! No sabia que merodeabas por la zona. Bienvenido al mundo Pokemon. Soy el Profesor Yoel, te estare guiando a lo largo de toda tu aventura.",
             "En tu recorrido, te integraras con criaturas extrañas llamadas pokemon, tu mision es investigarlas hasta saber todos sobre ellas. Capturar a un pokemon no es tarea sencilla: necesitas debilitarlo en su estado salvaje y luego lanzarle una PokeBall.",
@@ -285,15 +296,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     private float transitionTimer = 0f;
     private final float transitionDuration = 0.5f;
-    private boolean isFadingIn = false; // Disabled to prevent map appearing dark
+    private boolean isFadingIn = false;
 
     private Texture blackPixelTexture;
 
-    // Professor Yoel Animation Assets
     private Texture yoelTexture;
     private Image yoelImage;
-
-    // **VARIABLE ELIMINADA: private boolean pendingPokemonSelection = false;**
     protected String mapPath;
     private Screen nextScreen;
 
@@ -314,10 +322,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     protected Array<Collectible> collectibles;
     protected Random random;
 
-    // DEBUG: Set para que el usuario pueda grabar IDs de tiles
     private Set<Integer> recordedTiles = new HashSet<>();
 
-    // Receptionist
     private Texture recepcionistaTexture;
     private Image recepcionistaImage;
     private Table choiceBoxTable;
@@ -326,12 +332,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private Runnable onYesAction;
     private Runnable onNoAction;
 
-    // Track source map when entering Pokemon Center
     private String sourceMapBeforePokemonCenter = null;
     private Float returnTileXBeforePokemonCenter = null;
     private Float returnTileYBeforePokemonCenter = null;
-
-    // --- BATTLE NPCs ---
     private Texture kaneki1Texture, kaneki2Texture;
     private Image kanekiImage;
     private Texture jesucristo1Texture, jesucristo2Texture;
@@ -347,7 +350,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private Texture giorno1Texture, giorno2Texture;
     private Image giornoImage;
 
-    // --- DIALOGUE NPCs ---
     private Texture bonnie1Texture, bonnie2Texture;
     private Image bonnieImage;
     private Texture fntFoxy1Texture, fntFoxy2Texture;
@@ -362,7 +364,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private float npcAnimationTimer = 0f;
     private final float NPC_FRAME_DURATION = 0.5f;
 
-    // --- SUBMENUS ---
     private Table inventorySubmenuTable;
 
     private int selectedInventorySubmenuIndex = 0;
@@ -372,7 +373,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private Table pokemonInfoTable;
     private Pokemon selectedPokemonForHealing = null;
 
-    // --- POKEMONES MENU ---
     private Table pokemonesMenuTable;
     private Table typesMenuTable;
     private Table attacksMenuTable;
@@ -382,32 +382,27 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private int lastLogTileX = -1;
     private int lastLogTileY = -1;
 
-    // Debug Tool: List to record tiles
     private List<String> recordedTilesList = new ArrayList<>();
 
-    // Variables para el fondo de batalla dínámico
     private String pendingBattleBackground = null;
 
-    // --- TILES DE ENCUENTRO ESPECIAL (MAPA 1) ---
     private static final Set<String> SPECIAL_ENCOUNTER_TILES_MAP1 = new HashSet<>(Arrays.asList(
-            "70,34", "70,33", "69,33", "68,33", "67,33", "66,33", "65,33", "64,33", "63,33",
-            "63,32", "64,32", "65,32", "66,32", "67,32", "68,32", "69,32", "70,32",
-            "70,31", "69,31", "68,31", "67,31", "66,31", "65,31", "64,31", "63,31",
-            "63,30", "64,30", "65,30", "66,30", "67,30", "68,30", "69,30", "70,30",
-            "70,29", "69,29", "68,29", "67,29", "66,29", "65,29", "64,29", "63,29",
-            "63,28", "64,28", "65,28", "66,28", "67,28", "68,28", "69,28", "70,28",
-            "83,40", "84,40", "83,39", "84,39", "85,39", "86,39",
-            "83,38", "84,38", "85,38", "86,38", "87,38", "88,38", "89,38", "90,38",
-            "90,37", "89,37", "88,37", "87,37", "86,37", "85,37", "84,37",
+            "70,34", "70,33", "69,33", "68,33", "67,33", "66,33", "65,33", "64,33", "63,33", "63,32", "64,32", "65,32",
+            "66,32", "67,32", "68,32", "69,32", "70,32",
+            "70,31", "69,31", "68,31", "67,31", "66,31", "65,31", "64,31", "63,31", "63,30", "64,30", "65,30", "66,30",
+            "67,30", "68,30", "69,30", "70,30",
+            "70,29", "69,29", "68,29", "67,29", "66,29", "65,29", "64,29", "63,29", "63,28", "64,28", "65,28", "66,28",
+            "67,28", "68,28", "69,28", "70,28",
+            "83,40", "84,40", "83,39", "84,39", "85,39", "86,39", "83,38", "84,38", "85,38", "86,38", "87,38", "88,38",
+            "89,38", "90,38", "90,37", "89,37", "88,37", "87,37", "86,37", "85,37", "84,37",
             "84,23", "84,24", "84,25", "84,26", "84,27", "85,28", "85,27", "85,26", "85,25", "85,24", "85,23", "85,22",
-            "85,21",
-            "86,21", "86,22", "86,23", "86,24", "86,25", "86,26", "86,27", "86,28",
-            "87,29", "87,28", "87,27", "87,26", "87,25", "87,24", "87,22", "87,21",
-            "88,21", "88,22", "88,23", "88,24", "88,25", "88,26", "88,27", "88,28", "88,29",
-            "89,29", "89,28", "89,27", "89,26", "89,25", "89,24", "89,23", "89,22", "89,21",
-            "90,21", "90,22", "90,23", "90,24", "90,25", "90,26", "90,27", "90,28",
-            "91,27", "91,26", "91,25", "91,24", "91,23", "91,22",
-            "84,10", "85,10", "86,10", "87,10", "88,10", "89,10", "90,10", "91,10",
+            "85,21", "86,21", "86,22", "86,23", "86,24", "86,25", "86,26", "86,27", "86,28",
+            "87,29", "87,28", "87,27", "87,26", "87,25", "87,24", "87,22", "87,21", "88,21", "88,22", "88,23", "88,24",
+            "88,25", "88,26", "88,27", "88,28", "88,29",
+            "89,29", "89,28", "89,27", "89,26", "89,25", "89,24", "89,23", "89,22", "89,21", "90,21", "90,22", "90,23",
+            "90,24", "90,25", "90,26", "90,27", "90,28",
+            "91,27", "91,26", "91,25", "91,24", "91,23", "91,22", "84,10", "85,10", "86,10", "87,10", "88,10", "89,10",
+            "90,10", "91,10",
             "91,9", "90,9", "89,9", "88,9", "87,9", "86,9", "85,9", "84,9",
             "84,8", "85,8", "86,8", "87,8", "88,8", "89,8", "90,8", "91,8"));
 
@@ -650,15 +645,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             "144,19", "144,20", "144,21", "144,22", "144,23", "144,24", "144,25", "144,26", "145,17", "145,19",
             "145,20", "145,21", "145,22", "145,23", "145,24", "145,25"));
 
-    /**
-     * Constructor único: siempre inicia en estado DIALOGUE.
-     */
     public ScreenMapaTiled(Proyecto game) {
         this(game, "Mapa/MAPACOMPLETO.tmx", null, null, null, GameState.DIALOGUE);
     }
 
-    // Nuevo constructor que acepta el nombre del pokémon inicial (viene de la
-    // pantalla de selección)
     public ScreenMapaTiled(Proyecto game, String initialPokemonName) {
         this(game, "Mapa/MAPACOMPLETO.tmx", null, null, initialPokemonName, GameState.DIALOGUE);
     }
@@ -697,21 +687,18 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         this(game, mapPath, inventory, playerPokemon, initialPokemonName, initialState, null, null, null, null, null);
     }
 
-    // Constructor with custom spawn position
     public ScreenMapaTiled(Proyecto game, String mapPath, Inventario inventory, Pokemon playerPokemon,
             String initialPokemonName, GameState initialState, Float spawnX, Float spawnY) {
         this(game, mapPath, inventory, playerPokemon, initialPokemonName, initialState, spawnX, spawnY, null, null,
                 null);
     }
 
-    // Full constructor with custom spawn position and source map
     public ScreenMapaTiled(Proyecto game, String mapPath, Inventario inventory, Pokemon playerPokemon,
             String initialPokemonName, GameState initialState, Float spawnX, Float spawnY, String sourceMap) {
         this(game, mapPath, inventory, playerPokemon, initialPokemonName, initialState, spawnX, spawnY, sourceMap, null,
                 null);
     }
 
-    // Constructor with everything (including return coordinates)
     public ScreenMapaTiled(Proyecto game, String mapPath, Inventario inventory, Pokemon playerPokemon,
             String initialPokemonName, GameState initialState, Float spawnX, Float spawnY, String sourceMap,
             Float returnX, Float returnY) {
@@ -735,18 +722,11 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
     }
 
-    // UNIDAD 9: PATRÓN OBSERVER / NETWORKING
-    // Al conectar, pasamos una 'Lambda' (función anónima) que se ejecutará cada vez
-    // que el servidor envíe un mensaje. Esto es una forma de implementar el patrón
-    // Observer.
+    // Inicializa la conexión de red y define los observadores para mensajes y
+    // duelos
     private void initNetworking() {
         Gdx.app.log("NETWORK", "Iniciando red en IP: " + serverIP);
         conexion = new ConexionCliente(serverIP, 5000, message -> {
-            // UNIDAD 7: CONCURRENCIA E HILOS
-            // Los mensajes de red llegan en un hilo secundario de red.
-            // Gdx.app.postRunnable "pasa el mensaje" al hilo principal de renderizado (Hilo
-            // de LibGDX)
-            // para evitar errores de sincronización gráfica (Thread Safety).
             Gdx.app.postRunnable(() -> handleNetworkMessage(message));
         });
 
@@ -764,7 +744,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                         showYesNoChoice("Aceptar", "Rechazar", () -> {
                             duelManager.acceptDuel(challengerId, playerPokemon);
                         }, () -> {
-                            // Reject logic (optional)
                         });
                     };
                 });
@@ -800,7 +779,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     if (won) {
                         dialogueQueue.add("¡Has ganado el duelo!");
                         dialogueQueue.add("Tu " + playerPokemon.getEspecie() + " gana +1 punto de progreso.");
-                        // Implement reward logic here if strictly needed or server handles it
                     } else {
                         dialogueQueue.add("Has perdido el duelo...");
                     }
@@ -814,6 +792,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         conexion.conectar();
     }
 
+    // Procesa los mensajes JSON recibidos del servidor para actualizar el estado
+    // del mundo multijugador
     private void handleNetworkMessage(String message) {
         try {
             JsonValue root = new JsonReader().parse(message);
@@ -825,49 +805,59 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
             Gdx.app.log("NETWORK", "Mensaje recibido: " + tipo + " de " + id);
 
-            if ("mover".equals(tipo)) {
-                float x = root.getFloat("x");
-                float y = root.getFloat("y");
-                String dirStr = root.getString("dir", "DOWN");
-                boolean moving = root.getBoolean("moving", false);
+            switch (tipo) {
 
-                updateOtherPlayer(id, x, y, dirStr, moving);
-            } else if ("desconectar".equals(tipo)) {
-                removeOtherPlayer(id);
-            } else if (tipo.startsWith("duel_")) {
-                // Duel messages handled by manager
-                // Parse minimal needed info or pass raw? DuelManager parses structure?
-                // Let's modify DuelManager to parse or pass components.
-                // Assuming DuelManager processMessage takes components.
-                // We need to extract specific fields if DuelManager expects them.
-                // Or we can let DuelManager parse the whole JSON if we passed the object.
-                // For now, let's extract 'target' as senderId and 'damage' if present.
-                String sender = root.has("id") ? root.getString("id")
-                        : (root.has("target") ? root.getString("target") : "");
-                float dmg = root.has("damage") ? root.getFloat("damage") : 0;
-                duelManager.processMessage(tipo, sender, dmg);
+                case "player_join": {
+                    float x = root.getFloat("x");
+                    float y = root.getFloat("y");
+                    updateOtherPlayer(id, x, y, "DOWN", false);
+                    break;
+                }
 
-            } else if ("item_collected".equals(tipo)) {
-                String itemId = root.getString("itemId", "");
-                if (!itemId.isEmpty()) {
-                    sharedResourceManager.markResourceDepleted(itemId);
-                    // Remove from screen if visible
-                    for (Collectible c : collectibles) {
-                        String cId = mapPath + "_" + (int) c.getActor().getX() + "_" + (int) c.getActor().getY();
-                        if (cId.equals(itemId) && !c.isCollected()) {
-                            c.setCollected(true);
-                            Gdx.app.log("MULTI", "Recurso agotado por otro jugador: " + itemId);
+                case "mover": {
+                    float x = root.getFloat("x");
+                    float y = root.getFloat("y");
+                    String dirStr = root.getString("dir", "DOWN");
+                    boolean moving = root.getBoolean("moving", false);
+
+                    updateOtherPlayer(id, x, y, dirStr, moving);
+                    break;
+                }
+
+                case "desconectar": {
+                    removeOtherPlayer(id);
+                    break;
+                }
+                default:
+                    if (tipo.startsWith("duel_")) {
+                        String sender = root.has("id") ? root.getString("id")
+                                : (root.has("target") ? root.getString("target") : "");
+                        float dmg = root.has("damage") ? root.getFloat("damage") : 0;
+                        duelManager.processMessage(tipo, sender, dmg);
+                    }
+
+                    else if ("item_collected".equals(tipo)) {
+                        String itemId = root.getString("itemId", "");
+                        if (!itemId.isEmpty()) {
+                            sharedResourceManager.markResourceDepleted(itemId);
+
+                            for (Collectible c : collectibles) {
+                                String cId = mapPath + "_" + (int) c.getActor().getX() + "_"
+                                        + (int) c.getActor().getY();
+                                if (cId.equals(itemId) && !c.isCollected()) {
+                                    c.setCollected(true);
+                                    Gdx.app.log("MULTI", "Recurso agotado por otro jugador: " + itemId);
+                                }
+                            }
                         }
                     }
-                }
+                    break;
             }
+
         } catch (Exception e) {
             Gdx.app.error("NETWORK", "Error parsing message: " + message, e);
         }
     }
-
-    // **CONSTRUCTOR ELIMINADO: public ScreenMapaTiled(Proyecto game, GameState
-    // initialState)**
 
     private Animation<TextureRegion> createAnimation(String rowPrefix, float frameDuration) {
         Array<TextureAtlas.AtlasRegion> frames = new Array<>();
@@ -904,6 +894,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         return texture;
     }
 
+    // Configura y carga todos los elementos necesarios cuando se muestra la
+    // pantalla del mapa
     @Override
     public void show() {
         if (mapPath.contains("Centro Pokemon interior")) {
@@ -912,18 +904,17 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             game.playMusic("musica/mainMusic.mp3");
         }
 
-        // Si ya estamos inicializados y solo volvemos de una batalla, no reinicializar
-        // todo
+        if (isMultiplayer) {
+            initNetworking();
+        }
+
         if (batch != null && stage != null && camera != null && renderer != null) {
-            // Asegurar que el estado esté correcto
             if (currentState == GameState.BATTLE) {
                 currentState = GameState.FREE_ROAMING;
             }
 
-            // Limpiar cualquier input processor anterior
             Gdx.input.setInputProcessor(null);
 
-            // Restaurar el input processor
             InputMultiplexer multiplexer = new InputMultiplexer();
             multiplexer.addProcessor(this);
             if (uiStage != null) {
@@ -931,13 +922,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
             Gdx.input.setInputProcessor(multiplexer);
 
-            // Asegurar que la cámara esté actualizada
             if (characterActor != null && camera != null) {
                 clampCamera();
                 camera.update();
             }
-
-            // Asegurar que los viewports estén actualizados
             if (stage != null && stage.getViewport() != null) {
                 stage.getViewport().update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false);
             }
@@ -945,7 +933,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 uiStage.getViewport().update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
             }
 
-            // Limpiar las teclas de movimiento para evitar que el jugador se mueva solo
             clearMovementKeys();
 
             Gdx.app.log("MAP_SCREEN", "Pantalla del mapa restaurada después de batalla. Estado: " + currentState);
@@ -955,7 +942,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return;
         }
 
-        // Inicialización normal (primera vez)
         batch = new SpriteBatch();
         shapeRenderer = new com.badlogic.gdx.graphics.glutils.ShapeRenderer();
         camera = new OrthographicCamera();
@@ -967,12 +953,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             random = new Random();
         }
 
-        // --- Carga de Datos ---
         if (playerInventory == null) {
             String currentUser = sodyl.proyecto.clases.UserManager.getCurrentUser();
             Gdx.app.log("MAP_SCREEN", "Carga inicial. Usuario actual: " + currentUser);
             playerInventory = new Inventario();
-            // Cargar inventario del usuario actual
             playerInventory.load(currentUser);
             Gdx.app.log("MAP_SCREEN",
                     "Carga de inventario completa. Tamaño: " + playerInventory.getAllObjetos().size());
@@ -1126,6 +1110,17 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
 
         characterActor.setPosition(startX, startY);
+
+        if (isMultiplayer && conexion != null) {
+            String myId = sodyl.proyecto.clases.UserManager.getCurrentUser();
+            String joinMsg = "{"
+                    + "\"tipo\":\"player_join\","
+                    + "\"id\":\"" + myId + "\","
+                    + "\"x\":" + startX + ","
+                    + "\"y\":" + startY
+                    + "}";
+            conexion.enviarMensaje(joinMsg);
+        }
 
         stage = new Stage(new FitViewport(30, 25, camera));
 
@@ -1480,6 +1475,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
      * Carga las zonas de encuentro desde tiles de flores en la capa "Nivel 1".
      * Busca tiles de flores con pétalos y crea zonas de encuentro en cada uno.
      */
+    // Busca y define las áreas del mapa donde pueden ocurrir encuentros con Pokémon
+    // salvajes
     private void loadEncounterZones() {
         if (map == null) {
             Gdx.app.error("ENCOUNTER", "El mapa no está cargado. No se pueden cargar zonas de encuentro.");
@@ -1604,6 +1601,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
      * Verifica si el jugador está en una zona de encuentro y puede iniciar una
      * batalla.
      */
+    // Verifica si el jugador se encuentra en una baldosa que pueda activar un
+    // encuentro salvaje
     private void checkEncounterZones() {
         if (!canTriggerEncounter || currentState != GameState.FREE_ROAMING) {
             return;
@@ -3363,19 +3362,14 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         if (currentState == GameState.FREE_ROAMING) {
             handleMovement(delta);
 
-            // --- SINCRONIZACIÓN MULTIJUGADOR ---
+            // Envío constante de actualizaciones de posición al servidor para sincronizar
+            // otros clientes
             if (isMultiplayer && conexion != null) {
                 syncTimer += delta;
                 if (syncTimer >= SYNC_INTERVAL) {
                     syncTimer = 0;
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("tipo", "mover");
-                    data.put("id", sodyl.proyecto.clases.UserManager.getCurrentUser());
-                    data.put("x", characterActor.getX());
-                    data.put("y", characterActor.getY());
-                    data.put("dir", lastDirection.toString());
-                    data.put("moving", (movingUp || movingDown || movingLeft || movingRight));
-                    conexion.enviar(data);
+                    boolean isMoving = (movingUp || movingDown || movingLeft || movingRight);
+                    sendMovementUpdate(characterActor.getX(), characterActor.getY(), lastDirection.name(), isMoving);
                 }
             }
 
@@ -3685,6 +3679,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     // Variables eliminadas: distanceWalked y selectionEventTriggered ya no son
     // necesarias
 
+    // Gestiona el movimiento del jugador, detectando colisiones y transiciones
+    // entre mapas
     private void handleMovement(float delta) {
         if (currentState != GameState.FREE_ROAMING)
             return;
@@ -4567,6 +4563,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         return false;
     }
 
+    // Manejo de la liberación de teclas para detener el movimiento del personaje
     @Override
     public boolean keyUp(int keycode) {
         if (currentState != GameState.FREE_ROAMING)
@@ -5267,7 +5264,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
         itemTextures.clear();
 
-        // --- DISCONNECT NETWORKING ---
+        // Desconexión limpia de los servicios de red al cerrar la pantalla
         if (isMultiplayer && conexion != null) {
             Map<String, Object> data = new HashMap<>();
             data.put("tipo", "desconectar");

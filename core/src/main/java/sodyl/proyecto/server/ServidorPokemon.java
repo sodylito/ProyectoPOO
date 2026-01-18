@@ -74,6 +74,7 @@ public class ServidorPokemon {
         }
 
         private void processMessage(String jsonMsg) {
+            // Identificar al cliente por su "id"
             if (clientName == null && jsonMsg.contains("\"id\"")) {
                 int start = jsonMsg.indexOf("\"id\":\"") + 6;
                 int end = jsonMsg.indexOf("\"", start);
@@ -84,11 +85,10 @@ public class ServidorPokemon {
                 }
             }
 
+            // --- DUELOS ---
             if (jsonMsg.contains("\"tipo\": \"duel_request\"") || jsonMsg.contains("\"tipo\":\"duel_request\"")) {
                 String target = extractValue(jsonMsg, "target");
                 if (target != null && clientMap.containsKey(target)) {
-                    if (!jsonMsg.contains("\"id\"")) {
-                    }
                     clientMap.get(target).println(jsonMsg);
                     return;
                 }
@@ -102,10 +102,12 @@ public class ServidorPokemon {
                 }
             }
 
+            // --- RECURSOS COMPARTIDOS ---
             if (jsonMsg.contains("\"tipo\":\"item_collected\"") || jsonMsg.contains("\"tipo\": \"item_collected\"")) {
                 String itemId = extractValue(jsonMsg, "itemId");
                 if (itemId != null) {
                     if (isDepleted(itemId)) {
+                        // ignorar si ya está agotado
                     } else {
                         depletedResources.put(itemId, System.currentTimeMillis() + 60000);
                         broadcast(jsonMsg);
@@ -114,6 +116,15 @@ public class ServidorPokemon {
                 return;
             }
 
+            // --- ACTUALIZACIÓN DE JUGADORES ---
+            // No hace falta lógica compleja: el servidor solo reenvía
+            if (jsonMsg.contains("\"tipo\":\"player_update\"") || jsonMsg.contains("\"tipo\": \"player_update\"")
+                    || jsonMsg.contains("\"tipo\":\"player_join\"") || jsonMsg.contains("\"tipo\": \"player_join\"")) {
+                broadcast(jsonMsg);
+                return;
+            }
+
+            // Por defecto, reenviar todo
             broadcast(jsonMsg);
         }
 
