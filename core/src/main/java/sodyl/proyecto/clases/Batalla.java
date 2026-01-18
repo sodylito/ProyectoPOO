@@ -2,22 +2,14 @@ package sodyl.proyecto.clases;
 
 import java.util.Random;
 
-/**
- * Clase que maneja la lógica de batalla entre Pokémon.
- */
-// UNIDAD 2: COHESIÓN Y ACOPLAMIENTO
-// Esta clase presenta una ALTA COHESIÓN porque se encarga únicamente de la
-// lógica de combate.
-// El acoplamiento se mantiene controlado al recibir las dependencias (Pokemon,
-// Inventario)
-// por constructor, facilitando la mantenibilidad.
+//Clase que maneja la lógica de batalla entre Pokémon.
 public class Batalla {
     private Pokemon pokemonJugador;
     private Pokemon pokemonEnemigo;
     private Inventario inventario;
     private Random random;
     private boolean batallaTerminada;
-    private String ganador; // "JUGADOR" o "ENEMIGO"
+    private String ganador; // puede ser "JUGADOR" o "ENEMIGO"
 
     private float playerDamageMultiplier = 1.0f;
 
@@ -34,12 +26,6 @@ public class Batalla {
         this.playerDamageMultiplier = 1.5f;
     }
 
-    /**
-     * El jugador ataca al enemigo usando el movimiento especificado (1 o 2).
-     * 
-     * @param movimientoNumero 1 para movimiento1, 2 para movimiento2
-     * @return Mensaje descriptivo del ataque
-     */
     public void setPokemonJugador(Pokemon pokemonJugador) {
         this.pokemonJugador = pokemonJugador;
     }
@@ -48,39 +34,19 @@ public class Batalla {
         this.pokemonEnemigo = pokemonEnemigo;
     }
 
-    /**
-     * Determina quién ataca primero.
-     * 
-     * @param movimientoJugadorNum 1 o 2
-     * @param movimientoEnemigoNum 1 o 2
-     * @return true si el jugador ataca primero
-     */
+    // Determina quién ataca primero
     public boolean playerAttacksFirst(int movimientoJugadorNum, int movimientoEnemigoNum) {
         return pokemonJugador.getVelocidad() >= pokemonEnemigo.getVelocidad();
     }
 
-    /**
-     * Ejecuta un ataque individual.
-     * 
-     * @param atacante         Pokemon que ataca
-     * @param defensor         Pokemon que defiende
-     * @param movimientoNumero 1 o 2
-     * @return Mensaje del resultado
-     */
-    /**
-     * UNIDAD 1: PASE DE MENSAJES (Messaging)
-     * En POO, los "mensajes" son llamadas a métodos. Aquí 'Batalla' envía un
-     * mensaje
-     * al objeto 'atacante' (usarPPMovimiento) y luego delega la ejecución al método
-     * interno.
-     */
+    // Ejecuta un ataque individual
     public String executeAttack(Pokemon atacante, Pokemon defensor, int movimientoNumero) {
         if (batallaTerminada)
             return "";
 
         TiposAtaque movimiento = (movimientoNumero == 1) ? atacante.getMovimiento1() : atacante.getMovimiento2();
 
-        // Verificar PP
+        // Validar PP
         if (!atacante.usarPPMovimiento(movimientoNumero)) {
             return atacante.getEspecie() + " no tiene PP para " + movimiento.nombre + ".";
         }
@@ -88,28 +54,19 @@ public class Batalla {
         return ejecutarMovimiento(atacante, defensor, movimiento);
     }
 
-    /**
-     * El jugador ataca al enemigo usando el movimiento especificado (1 o 2).
-     * MANTENIDO POR COMPATIBILIDAD, PERO SE RECOMIENDA USAR executeAttack EN EL
-     * SCREEN.
-     * 
-     * @param movimientoNumero 1 para movimiento1, 2 para movimiento2
-     * @return Mensaje descriptivo del ataque
-     */
+    // El jugador ataca al enemigo usando el movimiento especificado (1 o 2)
     public String atacarEnemigo(int movimientoNumero) {
         if (batallaTerminada) {
             return "La batalla ya ha terminado.";
         }
 
-        // Nuevo sistema: el jugador escoge un movimiento, el enemigo elige uno
-        // aleatorio.
         TiposAtaque movimientoJugador = (movimientoNumero == 1) ? pokemonJugador.getMovimiento1()
                 : pokemonJugador.getMovimiento2();
         int movimientoEnemigoNum = random.nextBoolean() ? 1 : 2;
         TiposAtaque movimientoEnemigo = (movimientoEnemigoNum == 1) ? pokemonEnemigo.getMovimiento1()
                 : pokemonEnemigo.getMovimiento2();
 
-        // Verificar PP y consumir (intento de uso)
+        // Validar PP y consumir (intento de uso)
         boolean jugadorPuedeUsar = pokemonJugador.usarPPMovimiento(movimientoNumero);
         boolean enemigoPuedeUsar = pokemonEnemigo.usarPPMovimiento(movimientoEnemigoNum);
 
@@ -148,17 +105,12 @@ public class Batalla {
         return sb.toString();
     }
 
-    /**
-     * El enemigo ataca al jugador usando un movimiento aleatorio.
-     * 
-     * @return Mensaje descriptivo del ataque
-     */
+    // El enemigo ataca al jugador usando un movimiento aleatorio
     public String ataqueEnemigo() {
         if (batallaTerminada) {
             return "";
         }
 
-        // Mantener compatibilidad: elegir movimiento aleatorio y usar la nueva función
         int movimientoNumero = random.nextBoolean() ? 1 : 2;
         TiposAtaque movimiento = (movimientoNumero == 1) ? pokemonEnemigo.getMovimiento1()
                 : pokemonEnemigo.getMovimiento2();
@@ -184,22 +136,16 @@ public class Batalla {
         return ganador;
     }
 
-    /**
-     * Intenta capturar al Pokémon enemigo usando un objeto de captura.
-     * 
-     * @param itemId ID del objeto a usar (101 para Pokéball, 106 para MasterBall)
-     * @return true si la captura fue exitosa, false en caso contrario
-     */
+    // Intenta capturar al Pokémon enemigo usando un objeto de captura
     public boolean intentarCaptura(int itemId) {
-        // Permitir captura solo durante batalla activa (no terminada) y con Pokemon
-        // vivo (HP > 0)
+        // Permitir captura solo cuando el pokemón está vivo
         if (!batallaTerminada && pokemonEnemigo.getActualHP() > 0) {
-            // Verificar si hay el objeto solicitado
+            // Verificar si hay pokebola
             if (inventario.getQuantity(itemId) <= 0) {
                 return false;
             }
 
-            // Consumir objeto
+            // Consumir pokebola
             inventario.removeObjeto(itemId, 1);
 
             boolean capturado = false;
@@ -214,7 +160,7 @@ public class Batalla {
                         capturado = true;
                     }
                 } else {
-                    // General: 100% si HP <= 75%
+                    // Los demás pokemones: 100% si HP <= 75%
                     if (hpPorcentaje <= 0.75f) {
                         capturado = true;
                     }
@@ -237,8 +183,7 @@ public class Batalla {
         return false;
     }
 
-    // Rutina que ejecuta un movimiento de 'atacante' sobre 'defensor' y devuelve un
-    // mensaje descriptivo.
+    // Método encargado de ejecutar el movimiento y mostrar un msj descriptivo
     private String ejecutarMovimiento(Pokemon atacante, Pokemon defensor, TiposAtaque movimiento) {
         if (batallaTerminada)
             return "";
@@ -246,11 +191,9 @@ public class Batalla {
         StringBuilder salida = new StringBuilder();
         salida.append(atacante.getEspecie()).append(" usó ").append(movimiento.nombre).append("!");
 
-        // 2) Fórmula de daño solicitada
+        // Fórmula de daño
         int nivel = atacante.getNivel();
         int poder = movimiento.danoBase;
-
-        // Daño = (Poder_Ataque * (Nivel_Pokemon + 5)) / 10
         int danoBaseCalculado = (poder * (nivel + 5)) / 10;
 
         // Aplicar potenciador si es el jugador el que ataca
@@ -258,10 +201,10 @@ public class Batalla {
             danoBaseCalculado = (int) (danoBaseCalculado * playerDamageMultiplier);
         }
 
-        // Type effectiveness
+        // Eficacia del movimiento según la tabla
         double efectividad = TablaEficacia.getMultiplicador(movimiento.tipo, defensor.getTipo());
 
-        // Aplica el multiplicador de tipo AL FINAL de este cálculo
+        // Aplica el multiplicador de tipo
         int dano = (int) (danoBaseCalculado * efectividad);
 
         if (efectividad > 1.0)
@@ -272,7 +215,6 @@ public class Batalla {
             salida.append(" ¡No tuvo efecto!");
 
         // Aplicar daño
-
         if (efectividad == 0.0) {
             // no hace daño
         } else {
@@ -287,7 +229,6 @@ public class Batalla {
             salida.append("\n¡").append(defensor.getEspecie()).append(" se debilitó!");
 
             if (ganador.equals("JUGADOR")) {
-                // Battle results and rewards are now handled in ScreenBatalla.java
             }
         }
 

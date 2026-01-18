@@ -46,7 +46,7 @@ public class Objeto {
     private static final Map<Integer, Objeto> OBJETOS_CATALOG = new HashMap<>();
     private static final Map<Integer, Recipe> RECIPES_CATALOG = new HashMap<>();
 
-    // --- PROPIEDADES DE INSTANCIA
+    // PROPIEDADES
     private final int id;
     private final String nombre;
     private final Type tipo;
@@ -61,7 +61,7 @@ public class Objeto {
         this.description = description;
     }
 
-    // --- GETTERS DE INSTANCIA ---
+    // GETTERS
     public int getId() {
         return id;
     }
@@ -82,14 +82,14 @@ public class Objeto {
         return description;
     }
 
-    // --- MÉTODOS ESTÁTICOS DE INICIALIZACIÓN ---
+    // MÉTODOS DE INICIALIZACIÓN
 
     public static void initializeObjetos() {
         // Limpiar catálogos
         OBJETOS_CATALOG.clear();
         RECIPES_CATALOG.clear();
 
-        // 1. Definición de Objetos (Materiales 1-100)
+        // Objetos (Materiales Primarios)
         register(new Objeto(1, "Bonguri", Type.MATERIAL, "spritesObj/bongS.png",
                 "Una fruta dura utilizada para craftear Poké Balls."));
         register(new Objeto(2, "Guijarro Rojo", Type.MATERIAL, "spritesObj/guijRojoS.png",
@@ -101,10 +101,10 @@ public class Objeto {
         register(new Objeto(5, "Hierba Regia", Type.MATERIAL, "spritesObj/hierbRegS.png",
                 "Una hierba mágica utilizada para revivir y restaurar estados."));
 
-        // POKEBALLS
+        // Pokebolas
         register(new Objeto(101, "Pokeball", Type.POKEBALL, "spritesObj/pokebS.png",
                 "Un dispositivo para capturar y almacenar Pokémon."));
-        // MEDICINAS
+        // Medicinas
         register(new Objeto(103, "Poción", Type.MEDICINA, "spritesObj/pocionS.png", "Restaura 20 PS de un Pokémon."));
         register(new Objeto(104, "Superpoción", Type.MEDICINA, "spritesObj/superpS.png",
                 "Restaura 50 PS de un Pokémon. Más efectiva que una Poción."));
@@ -113,35 +113,32 @@ public class Objeto {
         register(new Objeto(106, "MasterBall", Type.POKEBALL, "spritesObj/masterBall.png",
                 "Captura el 100% de las veces, siempre y cuando el pokemón rival esté a la mitad de vida o menos."));
 
-        // 3. Definición de Recetas
-
-        // Receta de Pokeball: 1 Bonguri (1) + 1 Guijarro Rojo (2)
+        // Crafteo de Pokeball: 1 Bonguri + 1 Guijarro Rojo
         Map<Integer, Integer> pokeballIngredients = new HashMap<>();
         pokeballIngredients.put(1, 1);
         pokeballIngredients.put(2, 1);
         registerRecipe(new Recipe(101, 1, pokeballIngredients));
 
-        // Receta de Poción: 1 Hierba éter (3)
+        // Crafteo de Poción: 1 Hierba éter
         Map<Integer, Integer> potionIngredients = new HashMap<>();
         potionIngredients.put(3, 1);
         registerRecipe(new Recipe(103, 1, potionIngredients));
 
-        // Receta de Superpoción: 2 Hierba éter (3) + 1 Baya Aranja (4)
+        // Crafteo de Superpoción: 2 Hierba éter + 1 Baya Aranja
         Map<Integer, Integer> superpotionIngredients = new HashMap<>();
         superpotionIngredients.put(3, 2);
         superpotionIngredients.put(4, 1);
         registerRecipe(new Recipe(104, 1, superpotionIngredients));
 
-        // Receta de Piedra Potenciadora: 2 Guijarro Rojo (2) + 1 Hierba Regia (5) + 2
-        // Baya Aranja (4)
+        // Crafteo de Piedra Potenciadora: 2 Guijarro Rojo + 1 Hierba Regia + 2 Baya
+        // Aranja
         Map<Integer, Integer> boostIngredients = new HashMap<>();
         boostIngredients.put(2, 2);
         boostIngredients.put(5, 1);
         boostIngredients.put(4, 2);
         registerRecipe(new Recipe(105, 1, boostIngredients));
 
-        // Receta de MasterBall: 2 Guijarro Rojo (2) + 2 Hierba Regia (5) + 1 Pokeball
-        // (101)
+        // Crafteo de MasterBall: 2 Guijarro Rojo + 2 Hierba Regia + 1 Pokeball
         Map<Integer, Integer> masterballIngredients = new HashMap<>();
         masterballIngredients.put(2, 2);
         masterballIngredients.put(5, 2);
@@ -157,7 +154,7 @@ public class Objeto {
         RECIPES_CATALOG.put(recipe.getItemId(), recipe);
     }
 
-    // --- MÉTODOS ESTÁTICOS DE BÚSQUEDA ---
+    // MÉTODOS DE BÚSQUEDA
 
     public static Objeto getObjeto(int id) {
         return OBJETOS_CATALOG.get(id);

@@ -10,6 +10,8 @@ public class TiposAtaque {
     public TiposAtaque() {
     }
 
+    // Constructor para crear un ataque con todos los parámetros, lo usamos en
+    // Pokemones
     public TiposAtaque(String nombre, TiposPokemon tipo, int danoBase, int PP) {
         this.nombre = nombre;
         this.tipo = tipo;

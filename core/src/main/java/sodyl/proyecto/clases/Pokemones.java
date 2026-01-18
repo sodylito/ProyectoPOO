@@ -5,11 +5,10 @@ import java.util.Map;
 
 public class Pokemones {
 
-        // UNIDAD 10: COLECCIONES (Collections)
-        // HashMap es una estructura de datos que asocia una clave única con un valor.
-        // Se usa aquí por su alta eficiencia (O(1)) para buscar un Pokémon por su
-        // nombre,
-        // evitando tener que recorrer una lista completa (como en un ArrayList).
+        // Un HashMap es una colección,una estructura de datos que asocia una clave
+        // única con un valor.
+        // Lo usamos aquí para buscar a un pokemón por su nombre,
+        // evitando tener que recorrer una lista completa.
         private static final Map<String, Pokemon> misPokemones = new HashMap<>();
         private static final Map<String, TiposAtaque> misAtaques = new HashMap<>();
 
@@ -19,9 +18,8 @@ public class Pokemones {
                 TablaEficacia.definirTipos();
         }
 
-        // definimos los ataques en el hashmap, para despuès asignarselos a los
-        // pokemones
-        private static void definirAtaques() { // vamos a decir que el pokemon màs debil tiene 200HP
+        // Definimos los ataques en el hashmap, para después asignarlos a los pokemones
+        private static void definirAtaques() {
                 // 45-55 Poder
                 misAtaques.put("Pistola Agua", new TiposAtaque("Pistola Agua", TiposPokemon.AGUA, 55, 25));
                 misAtaques.put("Lanzallamas", new TiposAtaque("Lanzallamas", TiposPokemon.FUEGO, 55, 25));
@@ -58,20 +56,11 @@ public class Pokemones {
                 misAtaques.put("Juicio", new TiposAtaque("Juicio", TiposPokemon.NORMAL, 150, 8));
         }
 
-        // ahora instanciamos a los pokemones
-        /*
-         * Tier 1 (Básico): HP_Base=50, Crecimiento_HP=15
-         * Tier 2 (Intermedio): HP_Base=70, Crecimiento_HP=20
-         * Tier 3 (Avanzado): HP_Base=100, Crecimiento_HP=25
-         * Tier 4 (Héroes): HP_Base=150, Crecimiento_HP=30
-         * Tier 5 (BOSS FINAL): HP_Base=500, Crecimiento_HP=100
-         */
+        // Ahora, instanciamos a los pokemones
         private static void definirEspecies() {
-                // TIER 1: POKÉMON COMUNES (Base HP: 50, Growth: 15)
+                // POKEMONES CLASE BAJA
                 Pokemon rowlet = new Pokemon("Rowlet", TiposPokemon.PLANTA, 50, 15,
-                                misAtaques.get("Burbuja"), misAtaques.get("Bomba Seta")); // Modif: Burbuja (Hada) ->
-                                                                                          // Planta? No, mantener
-                                                                                          // asignacion
+                                misAtaques.get("Burbuja"), misAtaques.get("Bomba Seta"));
                 rowlet.setSpriteFront("gifPokemones/rowletAM2.gif");
                 rowlet.setSpriteBack("gifPokemones/rowletAM.gif");
                 misPokemones.put("Rowlet", rowlet);
@@ -88,12 +77,12 @@ public class Pokemones {
                 cyndaquil.setSpriteBack("gifPokemones/cyndaquilAM.gif");
                 misPokemones.put("Cyndaquil", cyndaquil);
 
-                // TIER 2: POKÉMON POCO COMUNES (Base HP: 70, Growth: 20)
+                // POKEMONES CLASE MEDIA
                 Pokemon ivysaur = new Pokemon("Ivysaur", TiposPokemon.PLANTA, 70, 20,
                                 misAtaques.get("Impactrueno"), misAtaques.get("Rayo Solar"));
                 ivysaur.setSpriteFront("gifPokemones/ivysaurAM.gif");
                 ivysaur.setSpriteBack("gifPokemones/ivysaurAM2.gif");
-                misPokemones.put("Ivysaur", ivysaur); // Nota: Ivysaur con Impactrueno? Se mantiene del original
+                misPokemones.put("Ivysaur", ivysaur);
 
                 Pokemon pikachu = new Pokemon("Pikachu", TiposPokemon.ELECTRICO, 70, 20,
                                 misAtaques.get("Impactrueno"), misAtaques.get("Picotazo"));
@@ -125,7 +114,7 @@ public class Pokemones {
                 sylveon.setSpriteBack("gifPokemones/sylveonAM.gif");
                 misPokemones.put("Sylveon", sylveon);
 
-                // TIER 3: POKÉMON AVANZADOS (Base HP: 100, Growth: 25)
+                // POKEMONES CLASE ALTA
                 Pokemon serperior = new Pokemon("Serperior", TiposPokemon.PLANTA, 100, 25,
                                 misAtaques.get("Avalancha"), misAtaques.get("Deslizamiento Herbáceo"));
                 serperior.setSpriteFront("gifPokemones/serperiorAM.gif");
@@ -150,7 +139,7 @@ public class Pokemones {
                 gyarados.setSpriteBack("gifPokemones/gyaradosAM2.gif");
                 misPokemones.put("Gyarados", gyarados);
 
-                // TIER 4: HÉROES (Base HP: 150, Growth: 30)
+                // POKEMONES CLASE SUPERIOR
                 Pokemon mewtwo = new Pokemon("Mewtwo", TiposPokemon.PSÍQUICO, 150, 30,
                                 misAtaques.get("Canto Mortal"), misAtaques.get("Rayo Hada"));
                 mewtwo.setSpriteFront("gifPokemones/mewtwoAM.gif");
@@ -163,7 +152,7 @@ public class Pokemones {
                 lucario.setSpriteBack("gifPokemones/lucarioAM2.gif");
                 misPokemones.put("Lucario", lucario);
 
-                // TIER 5: BOSS FINAL (Base HP: 500, Growth: 100)
+                // ARCEUS
                 Pokemon arceus = new Pokemon("Arceus", TiposPokemon.NORMAL, 500, 100,
                                 misAtaques.get("Juicio"), misAtaques.get("Hiperrayo"));
                 arceus.setSpriteFront("gifPokemones/arceusAM.gif");
@@ -171,18 +160,13 @@ public class Pokemones {
                 misPokemones.put("Arceus", arceus);
         }
 
-        // UNIDAD 9: PATRONES DE DISEÑO - PROTOTYPE / FACTORY
-        // Este método actúa como una fábrica de objetos que utiliza el patrón
-        // Prototype.
-        // En lugar de crear un objeto desde cero, buscamos una "plantilla" (template)
-        // y creamos una copia (instancia nueva) con los mismos valores base.
+        // AQUÍ USAMOS EL MÉTODO FACTORY (PATRÓN DE DISEÑO) PARA CREAR UN NUEVO POKEMON
         public static Pokemon getPokemon(String nombre) {
                 Pokemon plantilla = misPokemones.get(nombre);
                 if (plantilla == null) {
                         return null;
                 }
-
-                // Creamos una nueva instancia basada en la plantilla (Clonación lógica)
+                // Creamos una nueva instancia basada en la plantilla
                 Pokemon newPokemon = new Pokemon(plantilla.getEspecie(), plantilla.getTipo(), plantilla.getBaseHP(),
                                 plantilla.getGrowthHP(), plantilla.getMovimiento1(), plantilla.getMovimiento2());
                 newPokemon.setSpriteFront(plantilla.getSpriteFront());

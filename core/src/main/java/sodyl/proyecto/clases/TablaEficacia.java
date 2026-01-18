@@ -10,14 +10,14 @@ public class TablaEficacia {
     // representando el multiplicador de daño
     private static final Map<TiposPokemon, Map<TiposPokemon, Double>> tablaEfectividad = new HashMap<>();
 
-    public static void definirTipos() { // definimos los tipos en el mapap, tomados de TiposPokemon
+    public static void definirTipos() { // definimos los tipos en el mapa, tomados de TiposPokemon
         for (int i = 0; i < TiposPokemon.values().length; i++) {
             TiposPokemon tipo = TiposPokemon.values()[i];
             tablaEfectividad.put(tipo, new HashMap<>());
         }
 
         /*
-         * Reglas Clave (2.0x):
+         * Reglas a seguir (> es daño x2 y < es daño x0.5):
          * Agua > Fuego, Roca
          * Fuego > Planta
          * Planta > Agua, Roca
@@ -56,7 +56,7 @@ public class TablaEficacia {
 
         Map<TiposPokemon, Double> lucha = tablaEfectividad.get(TiposPokemon.LUCHA);
         lucha.put(TiposPokemon.NORMAL, 2.0);
-        lucha.put(TiposPokemon.ROCA, 2.0); // Standard
+        lucha.put(TiposPokemon.ROCA, 2.0);
         lucha.put(TiposPokemon.HADA, 0.5);
         lucha.put(TiposPokemon.VOLADOR, 0.5);
         lucha.put(TiposPokemon.PSÍQUICO, 0.5);
@@ -81,9 +81,7 @@ public class TablaEficacia {
         psiquico.put(TiposPokemon.PSÍQUICO, 0.5);
     }
 
-    // esta función devuelve el multiplicador hecho por el tipo, y recibe como
-    // parámetros
-    // el tipo del pokemón que estás atacando y el del pokemón que está defendiendo
+    // Esta función devuelve el multiplicador hecho por el tipo
     public static double getMultiplicador(TiposPokemon tipoAtaque, TiposPokemon tipoDefensa) {
         Map<TiposPokemon, Double> ataqueMap = tablaEfectividad.get(tipoAtaque);
         return ataqueMap.getOrDefault(tipoDefensa, 1.0);

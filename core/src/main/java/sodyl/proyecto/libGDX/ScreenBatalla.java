@@ -30,9 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-/**
- * Pantalla de batalla Pokémon - Estilo Esmeralda
- */
+//Pantalla de batalla Pokémon
 public class ScreenBatalla implements Screen, InputProcessor {
     private final Proyecto game;
     private final ScreenMapaTiled previousScreen;
@@ -50,11 +48,9 @@ public class ScreenBatalla implements Screen, InputProcessor {
     private String mapPath;
     private String customBackgroundPath;
 
-    // Battle Assets
     private Texture pokemonPlayerTexture;
     private Texture pokemonEnemyTexture;
 
-    // Animation
     private Animation<TextureRegion> playerAnimation;
     private float playerAnimationTimer = 0f;
     private Animation<TextureRegion> enemyAnimation;
@@ -63,37 +59,26 @@ public class ScreenBatalla implements Screen, InputProcessor {
     private Runnable onAttackAnimFinished;
     private boolean isAttackAnimActive = false;
 
-    // Flash Effect Variables (for healing and capture)
     private boolean isFlashActive = false;
     private float flashTimer = 0f;
     private Color flashColor = Color.WHITE;
-    private int flashCount = 0;
     private final int MAX_FLASHES = 2;
     private final float FLASH_DURATION = 0.15f;
     private Runnable onFlashComplete = null;
 
-    // --- UI Elements ---
     private Table rootTable;
     private Table enemyInfoTable;
     private Table playerInfoTable;
     private Table bottomMenuTable;
 
-    // Labels
     private Label enemyNameLabel;
     private Label enemyHPLabel;
     private Label playerNameLabel;
     private Label playerHPLabel;
-    private Label messageLabel; // Texto principal (izquierda abajo)
+    private Label messageLabel;
 
-    // Menu Options Labels
     private Label fightLabel, bagLabel, pokemonLabel, runLabel;
 
-    // --- State Machine ---
-    // UNIDAD 9: PATRONES DE DISEÑO - STATE (Estado)
-    // El uso de un Enum para controlar el flujo de la batalla es una implementación
-    // simplificada del patrón State, donde el comportamiento de la pantalla
-    // (input/render)
-    // cambia totalmente según el estado actual.
     private enum BattleState {
         INTRO,
         MAIN_MENU,
@@ -109,19 +94,17 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
     private BattleState currentState = BattleState.INTRO;
 
-    // Selection Indices
-    private int mainMenuIndex = 0; // 0:Fight, 1:Bag, 2:Pokemon, 3:Run
-    private int fightMenuIndex = 0; // 0:Move1, 1:Move2, 2:Cancel
-    private int bagMenuIndex = 0; // 0:Capture, 1:Heal, 2:PowerUp, 3:Cancel
-    private int bagCaptureMenuIndex = 0; // 0:Pokeball, 1:Masterball, 2:Cancel
-    private int bagHealMenuIndex = 0; // 0:Potion, 1:SuperPotion, 2:Cancel
-    private int pokemonMenuIndex = 0; // Index for team selection
+    // Opciones
+    private int mainMenuIndex = 0;
+    private int fightMenuIndex = 0;
+    private int bagMenuIndex = 0;
+    private int bagCaptureMenuIndex = 0;
+    private int bagHealMenuIndex = 0;
+    private int pokemonMenuIndex = 0;
 
     private float animationTimer = 0f;
-    // Logic Variables
     private float stateTimer = 0f;
-    private String pendingMessage = "";
-    private Runnable onMessageFinished = null; // Callback para cuando termina un mensaje
+    private Runnable onMessageFinished = null;
 
     private int switchesUsed = 0;
     private final int MAX_SWITCHES = 2;
@@ -130,7 +113,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
     private boolean isFinalBattle = false;
     private boolean isNPCBattle = false;
 
-    // Temporal para ver tamaños
     private java.util.List<String> debugPokemonList;
     private int debugIndex = 0;
     private int debugPlayerIndex = 0;
@@ -173,10 +155,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
                 customBackgroundPath, false);
     }
 
-    // UNIDAD 3: SOBRE CARGA DE CONSTRUCTORES (Constructor Overloading)
-    // Tenemos múltiples versiones del mismo constructor con diferentes parámetros.
-    // Esto permite crear la pantalla de batalla con diferentes configuraciones
-    // (si es tutorial, si es batalla final, etc.), demostrando flexibilidad.
     public ScreenBatalla(Proyecto game, ScreenMapaTiled previousScreen, Pokemon pokemonJugador, Pokemon pokemonEnemigo,
             Inventario inventario, boolean isTutorial, boolean isFinalBattle, String mapPath,
             String customBackgroundPath, boolean isNPCBattle) {
@@ -192,28 +170,26 @@ public class ScreenBatalla implements Screen, InputProcessor {
     }
 
     @Override
+    // Inicializa la pantalla de batalla
     public void show() {
         game.playMusic("musica/batallaMusic.mp3");
         batch = new SpriteBatch();
-        // Cargar fuente personalizada "Donuts Chocolate"
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(
                 Gdx.files.internal("Mapa/ari-w9500-bold.ttf"));
 
         FreeTypeFontParameter parameter = new FreeTypeFontParameter();
-        parameter.size = 20; // Tamaño ajustado para dialogos
+        parameter.size = 20;
         parameter.color = Color.WHITE;
-        // Incluir caracteres en español (tildes y ñ)
         parameter.characters = FreeTypeFontGenerator.DEFAULT_CHARS + "áéíóúÁÉÍÓÚñÑ¿¡";
 
         font = generator.generateFont(parameter);
-        generator.dispose(); // Liberar el generador después de crear la fuente
+        generator.dispose();
 
         stage = new Stage(new FitViewport(Proyecto.PANTALLA_W, Proyecto.PANTALLA_H));
 
         createTextures();
         createUI();
 
-        // Mensaje inicial
         showMessage("¡Un " + batalla.getPokemonEnemigo().getEspecie() + " salvaje apareció!", () -> {
             currentState = BattleState.MAIN_MENU;
             updateMenuVisuals();
@@ -223,47 +199,35 @@ public class ScreenBatalla implements Screen, InputProcessor {
     }
 
     private void createTextures() {
-        // 1. Background Logic
-        try {
-            String bgPath = "imagenes/fondoBatalla.jpg"; // Default
+        String bgPath = "imagenes/fondoBatalla.jpg";
 
-            if (isFinalBattle) {
-                bgPath = "Mapa/fondoRocoso1.png";
-            } else if (customBackgroundPath != null) {
-                // Custom background takes precedence over mapPath logic
-                bgPath = customBackgroundPath;
-            } else if (mapPath != null) {
-                if (mapPath.contains("MAPACOMPLETO")) {
-                    bgPath = "Mapa/fondoBatalla.jpg";
-                }
+        if (isFinalBattle) {
+            bgPath = "Mapa/fondoRocoso1.png";
+        } else if (customBackgroundPath != null) {
+            bgPath = customBackgroundPath;
+        } else if (mapPath != null) {
+            if (mapPath.contains("MAPACOMPLETO")) {
+                bgPath = "Mapa/fondoBatalla.jpg";
             }
-
-            // Fix double extension if user fixed it, or try both
-            if (!Gdx.files.internal(bgPath).exists()) {
-                if (bgPath.endsWith(".png.png")) {
-                    bgPath = bgPath.replace(".png.png", ".png");
-                }
-            }
-
-            backgroundTexture = new Texture(Gdx.files.internal(bgPath));
-        } catch (Exception e) {
-            Gdx.app.error("ScreenBatalla", "Fondo no encontrado: " + e.getMessage());
-            backgroundTexture = createPlaceholderTexture(new Color(0.2f, 0.3f, 0.5f, 1f));
         }
 
-        // 2. Pokemon Textures
-        // Player (Back)
+        if (!Gdx.files.internal(bgPath).exists()) {
+            if (bgPath.endsWith(".png.png")) {
+                bgPath = bgPath.replace(".png.png", ".png");
+            }
+        }
+
+        backgroundTexture = new Texture(Gdx.files.internal(bgPath));
+
+        // Texturas Pokemon
         loadSprite(batalla.getPokemonJugador().getSpriteBack(), true);
 
-        // Enemy (Front)
+        // Texturas Pokemon Enemigo
         loadSprite(batalla.getPokemonEnemigo().getSpriteFront(), false);
 
-        // UI Textures
+        // Texturas UI
         battleBoxTexture = createPlaceholderTexture(new Color(0.1f, 0.1f, 0.1f, 0.9f));
         selectionTexture = createPlaceholderTexture(new Color(1f, 1f, 0f, 0.3f));
-
-        // 3. Attack Animations - REMOVED per user request
-        // Replaced with Blink Effect
 
     }
 
@@ -284,8 +248,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
         rootTable.setFillParent(true);
         stage.addActor(rootTable);
 
-        // --- 1. TOP AREA (Enemy Info) ---
-        // Top-Left alignment
         Table topArea = new Table();
 
         enemyInfoTable = new Table();
@@ -299,17 +261,14 @@ public class ScreenBatalla implements Screen, InputProcessor {
         enemyInfoTable.add(enemyHPLabel).left().padTop(5);
 
         topArea.add(enemyInfoTable).left().top().padLeft(50).padTop(30);
-        topArea.add().expandX(); // Push to left
+        topArea.add().expandX();
 
         rootTable.add(topArea).expandX().fillX().top().height(Proyecto.PANTALLA_H * 0.3f).row();
 
-        // --- 2. MIDDLE AREA (Battle Scene Placeholder) ---
         rootTable.add().expand().fill().row();
 
-        // --- 3. BOTTOM AREA (Player Info + Menu) ---
         Table bottomArea = new Table();
 
-        // 3a. Player Info (Floating above menu, Right side)
         playerInfoTable = new Table();
         playerInfoTable.setBackground(new TextureRegionDrawable(battleBoxTexture));
         playerInfoTable.pad(15);
@@ -320,26 +279,20 @@ public class ScreenBatalla implements Screen, InputProcessor {
         playerInfoTable.add(playerNameLabel).right().row();
         playerInfoTable.add(playerHPLabel).right().padTop(5);
 
-        // Add Player Info to a container that aligns it Bottom-Right
         Table playerInfoContainer = new Table();
-        playerInfoContainer.add().expandX(); // Push right
+        playerInfoContainer.add().expandX();
         playerInfoContainer.add(playerInfoTable).right().padRight(50).padBottom(10);
 
         bottomArea.add(playerInfoContainer).expandX().fillX().bottom().row();
 
-        // 3b. Main Menu / Text Box (Fixed Height at bottom)
         bottomMenuTable = new Table();
         bottomMenuTable.setBackground(new TextureRegionDrawable(battleBoxTexture));
 
-        // Layout: Left side (Message/Prompt), Right side (Options Grid)
-        // Split 60% / 40%
-
-        // Left Side: Message
         messageLabel = new Label("", style);
         messageLabel.setWrap(true);
         bottomMenuTable.add(messageLabel).width(Proyecto.PANTALLA_W * 0.6f).pad(30).left().top().expandY();
 
-        // Right Side: Options Grid
+        // Menu de opciones de la batalla
         Table optionsTable = new Table();
         optionsTable.pad(20);
 
@@ -355,7 +308,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
         bottomMenuTable.add(optionsTable).width(Proyecto.PANTALLA_W * 0.4f).expandY().fill();
 
-        bottomArea.add(bottomMenuTable).expandX().fillX().height(200); // Altura fija para el menú
+        bottomArea.add(bottomMenuTable).expandX().fillX().height(200);
 
         rootTable.add(bottomArea).expandX().fillX().bottom();
 
@@ -374,13 +327,11 @@ public class ScreenBatalla implements Screen, InputProcessor {
     }
 
     private void updateMenuVisuals() {
-        // Reset all colors
         fightLabel.setColor(Color.GRAY);
         bagLabel.setColor(Color.GRAY);
         pokemonLabel.setColor(Color.GRAY);
         runLabel.setColor(Color.GRAY);
 
-        // Hide/Show logic based on state
         Table optionsTable = (Table) bottomMenuTable.getChildren().get(1);
 
         if (currentState == BattleState.MAIN_MENU) {
@@ -402,7 +353,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
                     break;
             }
 
-            // Restore original text
             fightLabel.setText("LUCHAR");
             bagLabel.setText("MOCHILA");
             pokemonLabel.setText("POKEMON");
@@ -440,8 +390,8 @@ public class ScreenBatalla implements Screen, InputProcessor {
             optionsTable.setVisible(true);
             messageLabel.setText("Elige una Pokéball:");
 
-            fightLabel.setText("POKEBALL"); // ID 101
-            bagLabel.setText("MASTERBALL"); // ID 106
+            fightLabel.setText("POKEBALL");
+            bagLabel.setText("MASTERBALL");
             pokemonLabel.setText("---");
             runLabel.setText("ATRÁS");
 
@@ -453,8 +403,8 @@ public class ScreenBatalla implements Screen, InputProcessor {
             optionsTable.setVisible(true);
             messageLabel.setText("Elige una Poción:");
 
-            fightLabel.setText("POCIÓN"); // ID 103
-            bagLabel.setText("SUPERPOCIÓN"); // ID 104
+            fightLabel.setText("POCIÓN");
+            bagLabel.setText("SUPERPOCIÓN");
             pokemonLabel.setText("---");
             runLabel.setText("ATRÁS");
 
@@ -468,7 +418,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
             java.util.List<Pokemon> team = sodyl.proyecto.clases.Pokedex.getTeam();
 
-            // Map slots to labels
             fightLabel.setText(team.size() > 0 ? team.get(0).getEspecie() : "---");
             bagLabel.setText(team.size() > 1 ? team.get(1).getEspecie() : "---");
             pokemonLabel.setText(team.size() > 2 ? team.get(2).getEspecie() : "---");
@@ -480,7 +429,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
             runLabel.setColor(pokemonMenuIndex == 3 ? Color.YELLOW : Color.GRAY);
 
         } else {
-            // In message mode or enemy turn, hide options
             optionsTable.setVisible(false);
         }
     }
@@ -489,12 +437,9 @@ public class ScreenBatalla implements Screen, InputProcessor {
         currentState = BattleState.MESSAGE_WAIT;
         messageLabel.setText(text);
         this.onMessageFinished = onFinished;
-        // Hide options
         Table optionsTable = (Table) bottomMenuTable.getChildren().get(1);
         optionsTable.setVisible(false);
     }
-
-    // --- INPUT HANDLING ---
 
     @Override
     public boolean keyDown(int keycode) {
@@ -589,16 +534,15 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
         if (keycode == Keys.Z || keycode == Keys.ENTER) {
             switch (mainMenuIndex) {
-                case 0: // FIGHT
+                case 0:
                     currentState = BattleState.FIGHT_MENU;
                     fightMenuIndex = 0;
                     break;
-                case 1: // BAG
+                case 1:
                     currentState = BattleState.BAG_MENU;
                     bagMenuIndex = 0;
                     break;
-                case 2: // POKEMON
-                    // Check if player has more than 1 Pokemon
+                case 2:
                     if (sodyl.proyecto.clases.Pokedex.getTeam().size() <= 1) {
                         showMessage("¡Solo tienes un Pokémon!", () -> {
                             currentState = BattleState.MAIN_MENU;
@@ -609,7 +553,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
                         pokemonMenuIndex = 0;
                     }
                     break;
-                case 3: // RUN
+                case 3:
                     if (isTutorial) {
                         showMessage("¡No puedes huir!", () -> {
                             currentState = BattleState.MAIN_MENU;
@@ -646,10 +590,9 @@ public class ScreenBatalla implements Screen, InputProcessor {
         }
 
         if (keycode == Keys.Z || keycode == Keys.ENTER) {
-            if (fightMenuIndex == 3) { // ATRAS
+            if (fightMenuIndex == 3) {
                 currentState = BattleState.MAIN_MENU;
             } else if (fightMenuIndex == 0 || fightMenuIndex == 1) {
-                // Execute Attack
                 int moveIndex = fightMenuIndex + 1;
                 performPlayerAttack(moveIndex);
             }
@@ -674,7 +617,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
         }
 
         if (keycode == Keys.Z || keycode == Keys.ENTER) {
-            if (bagMenuIndex == 0) { // CAPTURAR
+            if (bagMenuIndex == 0) {
                 if (isNPCBattle) {
                     showMessage("¡No puedes capturar el Pokémon de otro entrenador!", () -> {
                         currentState = BattleState.BAG_MENU;
@@ -684,10 +627,10 @@ public class ScreenBatalla implements Screen, InputProcessor {
                 }
                 currentState = BattleState.BAG_CAPTURE_MENU;
                 bagCaptureMenuIndex = 0;
-            } else if (bagMenuIndex == 1) { // CURAR
+            } else if (bagMenuIndex == 1) {
                 currentState = BattleState.BAG_HEAL_MENU;
                 bagHealMenuIndex = 0;
-            } else if (bagMenuIndex == 2) { // POTENCIAR
+            } else if (bagMenuIndex == 2) {
                 if (inventario.getQuantity(105) <= 0) {
                     showMessage("¡No tienes Piedras Potenciadoras!", () -> {
                         currentState = BattleState.BAG_MENU;
@@ -702,7 +645,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
                         startEnemyTurn();
                     });
                 });
-            } else if (bagMenuIndex == 3) { // ATRÁS
+            } else if (bagMenuIndex == 3) {
                 currentState = BattleState.MAIN_MENU;
             }
         }
@@ -726,11 +669,11 @@ public class ScreenBatalla implements Screen, InputProcessor {
         }
 
         if (keycode == Keys.Z || keycode == Keys.ENTER) {
-            if (bagCaptureMenuIndex == 0) { // POKEBALL
+            if (bagCaptureMenuIndex == 0) {
                 attemptCapture(101);
-            } else if (bagCaptureMenuIndex == 1) { // MASTERBALL
+            } else if (bagCaptureMenuIndex == 1) {
                 attemptCapture(106);
-            } else if (bagCaptureMenuIndex == 3) { // ATRÁS
+            } else if (bagCaptureMenuIndex == 3) {
                 currentState = BattleState.BAG_MENU;
             }
         }
@@ -754,11 +697,11 @@ public class ScreenBatalla implements Screen, InputProcessor {
         }
 
         if (keycode == Keys.Z || keycode == Keys.ENTER) {
-            if (bagHealMenuIndex == 0) { // POCIÓN
+            if (bagHealMenuIndex == 0) {
                 useHealItem(103, 20);
-            } else if (bagHealMenuIndex == 1) { // SUPERPOCIÓN
+            } else if (bagHealMenuIndex == 1) {
                 useHealItem(104, 50);
-            } else if (bagHealMenuIndex == 3) { // ATRÁS
+            } else if (bagHealMenuIndex == 3) {
                 currentState = BattleState.BAG_MENU;
             }
         }
@@ -777,7 +720,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
         Pokemon player = batalla.getPokemonJugador();
 
-        // Check if Pokemon is already at full HP
         if (player.getActualHP() >= player.getMaxHp()) {
             showMessage("¡" + player.getEspecie() + " ya tiene toda su vida!", () -> {
                 currentState = BattleState.BAG_HEAL_MENU;
@@ -786,13 +728,11 @@ public class ScreenBatalla implements Screen, InputProcessor {
             return;
         }
 
-        // Use item
         inventario.removeObjeto(itemId, 1);
         int oldHP = player.getActualHP();
         player.setActualHP(Math.min(player.getActualHP() + healAmount, player.getMaxHp()));
         int actualHealed = player.getActualHP() - oldHP;
 
-        // Trigger green flash effect
         triggerFlash(new Color(0f, 1f, 0f, 0.7f), () -> {
             updateInfoLabels();
             showMessage(
@@ -802,8 +742,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
                     });
         });
     }
-
-    // --- BATTLE LOGIC ---
 
     private void handlePokemonMenuInput(int keycode) {
         if (keycode == Keys.UP && pokemonMenuIndex >= 2)
@@ -815,7 +753,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
         if (keycode == Keys.RIGHT && (pokemonMenuIndex % 2) == 0)
             pokemonMenuIndex++;
 
-        // Clamp index based on team size
         java.util.List<Pokemon> team = sodyl.proyecto.clases.Pokedex.getTeam();
 
         if (keycode == Keys.X || keycode == Keys.ESCAPE) {
@@ -825,7 +762,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
         }
 
         if (keycode == Keys.Z || keycode == Keys.ENTER) {
-            if (pokemonMenuIndex == 3) { // ATRAS
+            if (pokemonMenuIndex == 3) {
                 currentState = BattleState.MAIN_MENU;
             } else {
                 if (pokemonMenuIndex < team.size()) {
@@ -864,14 +801,12 @@ public class ScreenBatalla implements Screen, InputProcessor {
         switchesUsed++;
         batalla.setPokemonJugador(newPokemon);
 
-        // Update Texture
-        // Update Texture
         loadSprite(newPokemon.getSpriteBack(), true);
 
         updateInfoLabels();
 
         showMessage("¡Adelante " + newPokemon.getEspecie() + "!", () -> {
-            startEnemyTurn(); // Switching takes a turn
+            startEnemyTurn();
         });
     }
 
@@ -887,10 +822,8 @@ public class ScreenBatalla implements Screen, InputProcessor {
             return;
         }
 
-        // 1. Determine Enemy Move (Random)
         int enemyMoveIndex = (Math.random() < 0.5) ? 1 : 2;
 
-        // 2. Determine Order
         boolean playerFirst = batalla.playerAttacksFirst(moveIndex, enemyMoveIndex);
 
         if (playerFirst) {
@@ -901,19 +834,17 @@ public class ScreenBatalla implements Screen, InputProcessor {
     }
 
     private void executeTurnSequence(Pokemon first, int firstMove, Pokemon second, int secondMove) {
-        // Execute first attack
         String msg1 = batalla.executeAttack(first, second, firstMove);
-        // Do NOT update HP visuals yet
 
         showMessage(msg1, () -> {
             boolean isPlayerFirst = (first == batalla.getPokemonJugador());
             triggerAttackAnim(isPlayerFirst, first, firstMove, () -> {
-                updateInfoLabels(); // Update visuals now
+                updateInfoLabels();
 
                 if (second.getActualHP() <= 0) {
                     handleFaint(second);
                 } else {
-                    // Execute second attack
+
                     String msg2 = batalla.executeAttack(second, first, secondMove);
                     showMessage(msg2, () -> {
                         boolean isPlayerSecond = (second == batalla.getPokemonJugador());
@@ -923,7 +854,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
                             if (first.getActualHP() <= 0) {
                                 handleFaint(first);
                             } else {
-                                // End of turn
                                 currentState = BattleState.MAIN_MENU;
                                 updateMenuVisuals();
                             }
@@ -938,21 +868,12 @@ public class ScreenBatalla implements Screen, InputProcessor {
         isAttackAnimActive = true;
         animationTimer = 0f;
         onAttackAnimFinished = onComplete;
-        // No more sprite setup, logic handled in render()
     }
 
-    /**
-     * Triggers a screen flash effect with the specified color
-     * 
-     * @param color      The color of the flash (e.g., green for healing, orange for
-     *                   capture)
-     * @param onComplete Callback to run after flash completes
-     */
     private void triggerFlash(Color color, Runnable onComplete) {
         isFlashActive = true;
         flashTimer = 0f;
         flashColor = new Color(color);
-        flashCount = 0;
         onFlashComplete = onComplete;
     }
 
@@ -960,8 +881,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
         boolean isPlayer = (fainted == batalla.getPokemonJugador());
 
         if (isPlayer) {
-            // LOSS CONDITION
-            // 1. Find a crafted item to remove (POKEBALL or MEDICINA)
             int itemsRemovedCount = 0;
 
             Map<Integer, Integer> items = inventario.getAllObjetos();
@@ -984,7 +903,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
                     int itemToRemoveId = craftedItems.get(new Random().nextInt(craftedItems.size()));
                     inventario.removeObjeto(itemToRemoveId, 1);
 
-                    // Update list if run out
                     if (inventario.getQuantity(itemToRemoveId) <= 0) {
                         craftedItems.remove((Integer) itemToRemoveId);
                     }
@@ -1002,8 +920,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
             showMessage(lossMsg, this::returnToMap);
 
         } else {
-            // WIN CONDITION
-            // Enemy fainted
             if (isFinalBattle) {
                 sodyl.proyecto.clases.Pokedex.addResearchPoints(fainted.getEspecie(), 10);
                 showMessage("¡HAS DERROTADO A ARCEUS! ¡OBJETIVO COMPLETADO!", () -> {
@@ -1012,20 +928,16 @@ public class ScreenBatalla implements Screen, InputProcessor {
             } else {
                 sodyl.proyecto.clases.Pokedex.addResearchPoints(fainted.getEspecie(), 1);
 
-                // Reward Logic
                 int rewardId;
                 if (isNPCBattle) {
-                    // High Value Reward for NPC Battles: Revivir Máximo (106)
                     rewardId = 106;
                 } else {
-                    // Standard Reward for Wild Pokemon: Random Material (ID 1-5)
-                    rewardId = new Random().nextInt(5) + 1; // 1 to 5
+                    rewardId = new Random().nextInt(5) + 1;
                 }
 
                 Objeto rewardObj = Objeto.getObjeto(rewardId);
                 inventario.addObjeto(rewardId, 1);
 
-                // LVL Logic: +1 to winner
                 Pokemon winner = batalla.getPokemonJugador();
                 int oldLevel = winner.getNivel();
                 winner.setNivel(oldLevel + 1);
@@ -1043,7 +955,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
     private void startEnemyTurn() {
         currentState = BattleState.ENEMY_TURN;
-        // Small delay before enemy attacks
         stateTimer = 0f;
     }
 
@@ -1064,27 +975,23 @@ public class ScreenBatalla implements Screen, InputProcessor {
             return;
         }
 
-        // Trigger capture flash
         Color flashColor = (itemId == 106) ? Color.MAGENTA : new Color(1f, 0.65f, 0f, 0.8f);
 
         triggerFlash(flashColor, () -> {
             boolean captured = batalla.intentarCaptura(itemId);
 
             if (captured) {
-                // addCollected already adds +2 research points internally
                 sodyl.proyecto.clases.Pokedex.addCollected(batalla.getPokemonEnemigo());
 
                 if (isTutorial) {
                     sodyl.proyecto.clases.Pokedex.setTutorialCompleted(true);
                     showMessage("¡Tutorial completado! ¡Bien hecho!", this::returnToMap);
                 } else if (isFinalBattle) {
-                    // Capture Win
                     sodyl.proyecto.clases.Pokedex.addResearchPoints(batalla.getPokemonEnemigo().getEspecie(), 10);
                     showMessage("¡HAS CAPTURADO A ARCEUS! ¡INCREÍBLE!", () -> {
                         showMessage("¡Investigación completada! ¡Has dominado el juego!", this::returnToMap);
                     });
                 } else {
-                    // Winner +1 level
                     Pokemon winner = batalla.getPokemonJugador();
                     int oldLvl = winner.getNivel();
                     winner.setNivel(oldLvl + 1);
@@ -1109,7 +1016,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
     private void returnToMap() {
         if (previousScreen != null) {
-            // Check if player won an NPC battle
             if (isNPCBattle && batalla.getPokemonEnemigo().getActualHP() <= 0) {
                 previousScreen.onNPCBattleVictory(previousScreen.getCurrentBattleNPC());
                 game.setScreen(previousScreen);
@@ -1128,16 +1034,13 @@ public class ScreenBatalla implements Screen, InputProcessor {
     public void render(float delta) {
         ScreenUtils.clear(0, 0, 0, 1);
 
-        // Apply viewport and update camera
         stage.getViewport().apply();
         batch.setProjectionMatrix(stage.getCamera().combined);
 
         batch.begin();
-        // 1. Background
         batch.draw(backgroundTexture, 0, 0, Proyecto.PANTALLA_W, Proyecto.PANTALLA_H);
 
-        // 2. Pokemon Placeholders
-        float enemyScale = 100f; // Tamaño base
+        float enemyScale = 100f;
         String enemyName = batalla.getPokemonEnemigo().getEspecie();
 
         if (enemyName.equals("Rowlet")) {
@@ -1145,9 +1048,9 @@ public class ScreenBatalla implements Screen, InputProcessor {
         } else if (enemyName.equals("Oshawott")) {
             enemyScale = 75f;
         } else if (enemyName.equals("Sylveon")) {
-            enemyScale = 160f; // Disminuido de 200f
+            enemyScale = 160f;
         } else if (enemyName.equals("Arceus")) {
-            enemyScale = 310f; // Disminuido de 350f
+            enemyScale = 310f;
         } else if (enemyName.equals("Mewtwo")) {
             enemyScale = 160f;
         } else if (enemyName.equals("Charizard")) {
@@ -1162,34 +1065,35 @@ public class ScreenBatalla implements Screen, InputProcessor {
             enemyScale = 260f;
         }
 
-        float enemyX = Proyecto.PANTALLA_W * 0.60f; // Posición base
+        float enemyX = Proyecto.PANTALLA_W * 0.60f;
         float enemyY = Proyecto.PANTALLA_H * 0.50f;
 
         if (enemyName.equals("Arceus")) {
             enemyX = Proyecto.PANTALLA_W * 0.50f;
-            enemyY = Proyecto.PANTALLA_H * 0.40f; // Subido (era 0.35f)
+            enemyY = Proyecto.PANTALLA_H * 0.40f;
         } else if (enemyName.equals("Gyarados")) {
-            enemyX = Proyecto.PANTALLA_W * 0.48f; // Un poco a la derecha (era 0.45)
-            enemyY = Proyecto.PANTALLA_H * 0.46f; // Un poco más abajo (era 0.50)
+            enemyX = Proyecto.PANTALLA_W * 0.48f;
+            enemyY = Proyecto.PANTALLA_H * 0.46f;
         } else if (enemyName.equals("Sylveon")) {
-            enemyX = Proyecto.PANTALLA_W * 0.53f; // Un poco a la derecha (era 0.50)
-            enemyY = Proyecto.PANTALLA_H * 0.46f; // Un poco más abajo (era 0.50)
+            enemyX = Proyecto.PANTALLA_W * 0.53f;
+            enemyY = Proyecto.PANTALLA_H * 0.46f;
         } else if (enemyName.equals("Serperior")) {
-            enemyX = Proyecto.PANTALLA_W * 0.53f; // Un poco a la derecha (era 0.50)
-            enemyY = Proyecto.PANTALLA_H * 0.46f; // Un poco más abajo (era 0.50)
+            enemyX = Proyecto.PANTALLA_W * 0.53f;
+            enemyY = Proyecto.PANTALLA_H * 0.46f;
         } else if (enemyName.equals("Blastoise")) {
-            enemyX = Proyecto.PANTALLA_W * 0.52f; // Rodado a la izquierda (era 0.60 base)
+            enemyX = Proyecto.PANTALLA_W * 0.52f;
         }
 
         if (enemyAnimation != null) {
             enemyAnimationTimer += delta;
             TextureRegion currentFrame = enemyAnimation.getKeyFrame(enemyAnimationTimer, true);
-            batch.draw(currentFrame, enemyX, enemyY, enemyScale, enemyScale);
-        } else {
+            if (currentFrame != null) {
+                batch.draw(currentFrame, enemyX, enemyY, enemyScale, enemyScale);
+            }
+        } else if (pokemonEnemyTexture != null) {
             batch.draw(pokemonEnemyTexture, enemyX, enemyY, enemyScale, enemyScale);
         }
 
-        // Player (Bottom Left)
         float playerScale = 100f;
         String playerName = batalla.getPokemonJugador().getEspecie();
 
@@ -1198,9 +1102,9 @@ public class ScreenBatalla implements Screen, InputProcessor {
         } else if (playerName.equals("Oshawott")) {
             playerScale = 75f;
         } else if (playerName.equals("Arceus")) {
-            playerScale = 310f; // Mismo tamaño que el rival
+            playerScale = 310f;
         } else if (playerName.equals("Sylveon")) {
-            playerScale = 160f; // Disminuido de 200f
+            playerScale = 160f;
         } else if (playerName.equals("Mewtwo")) {
             playerScale = 160f;
         } else if (playerName.equals("Charizard")) {
@@ -1217,34 +1121,31 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
         float playerX = Proyecto.PANTALLA_W * 0.25f;
         if (playerName.equals("Sylveon")) {
-            playerX = Proyecto.PANTALLA_W * 0.15f; // Más a la izquierda
+            playerX = Proyecto.PANTALLA_W * 0.15f;
         }
         float playerY = Proyecto.PANTALLA_H * 0.20f;
 
         if (playerAnimation != null) {
             playerAnimationTimer += delta;
             TextureRegion currentFrame = playerAnimation.getKeyFrame(playerAnimationTimer, true);
-            batch.draw(currentFrame, playerX, playerY, playerScale, playerScale);
-        } else {
+            if (currentFrame != null) {
+                batch.draw(currentFrame, playerX, playerY, playerScale, playerScale);
+            }
+        } else if (pokemonPlayerTexture != null) {
             batch.draw(pokemonPlayerTexture, playerX, playerY, playerScale, playerScale);
         }
 
-        // 3. Attack Animation (Blink Effect)
         if (isAttackAnimActive) {
             animationTimer += delta;
 
-            // Simple "Blink" Effect: Flash White twice
-            // Cycle: 0.0 -> 0.1 (White), 0.1 -> 0.2 (Clear), 0.2 -> 0.3 (White), 0.3 -> End
-
             float alpha = 0f;
             if (animationTimer < 0.1f) {
-                alpha = 0.7f; // Flash on
+                alpha = 0.7f;
             } else if (animationTimer < 0.2f) {
-                alpha = 0f; // Flash off
+                alpha = 0f;
             } else if (animationTimer < 0.3f) {
-                alpha = 0.7f; // Flash on
+                alpha = 0.7f;
             } else if (animationTimer > 0.4f) {
-                // Done
                 isAttackAnimActive = false;
                 if (onAttackAnimFinished != null) {
                     onAttackAnimFinished.run();
@@ -1252,7 +1153,7 @@ public class ScreenBatalla implements Screen, InputProcessor {
             }
 
             if (alpha > 0) {
-                batch.end(); // End SpriteBatch to draw shapes
+                batch.end();
 
                 Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
                 Gdx.gl.glBlendFunc(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA,
@@ -1264,36 +1165,30 @@ public class ScreenBatalla implements Screen, InputProcessor {
                 shapeRenderer.setColor(1f, 1f, 1f, alpha);
                 shapeRenderer.rect(0, 0, Proyecto.PANTALLA_W, Proyecto.PANTALLA_H);
                 shapeRenderer.end();
-                shapeRenderer.dispose(); // Important to dispose if creating new instance
+                shapeRenderer.dispose();
 
                 Gdx.gl.glDisable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
 
-                batch.begin(); // Restart SpriteBatch
+                batch.begin();
             }
         }
 
-        // 4. Flash Effect (for healing and capture)
         if (isFlashActive) {
             flashTimer += delta;
 
-            // Determine if we should show the flash (on) or hide it (off)
-            // Each flash cycle: FLASH_DURATION on, FLASH_DURATION off
             float cycleTime = flashTimer % (FLASH_DURATION * 2);
             boolean showFlash = cycleTime < FLASH_DURATION;
 
-            // Count completed flashes
             int completedFlashes = (int) (flashTimer / (FLASH_DURATION * 2));
 
             if (completedFlashes >= MAX_FLASHES) {
-                // Flash animation complete
                 isFlashActive = false;
                 if (onFlashComplete != null) {
                     onFlashComplete.run();
                     onFlashComplete = null;
                 }
             } else if (showFlash) {
-                // Draw flash overlay
-                batch.end(); // End SpriteBatch to draw shapes
+                batch.end();
 
                 Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
                 Gdx.gl.glBlendFunc(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA,
@@ -1309,13 +1204,12 @@ public class ScreenBatalla implements Screen, InputProcessor {
 
                 Gdx.gl.glDisable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
 
-                batch.begin(); // Restart SpriteBatch
+                batch.begin();
             }
         }
 
         batch.end();
 
-        // Logic for Enemy Turn Delay
         if (currentState == BattleState.ENEMY_TURN) {
             stateTimer += delta;
             if (stateTimer > 1.0f) {
@@ -1330,8 +1224,8 @@ public class ScreenBatalla implements Screen, InputProcessor {
                         updateMenuVisuals();
                     }
                 });
-                stateTimer = 0f; // Reset to avoid multiple calls
-                currentState = BattleState.MESSAGE_WAIT; // Wait for user to read attack msg
+                stateTimer = 0f;
+                currentState = BattleState.MESSAGE_WAIT;
             }
         }
 
@@ -1406,7 +1300,6 @@ public class ScreenBatalla implements Screen, InputProcessor {
     }
 
     private void loadSprite(String path, boolean isPlayer) {
-        // Dispose previous
         if (isPlayer) {
             if (pokemonPlayerTexture != null) {
                 pokemonPlayerTexture.dispose();
@@ -1431,87 +1324,73 @@ public class ScreenBatalla implements Screen, InputProcessor {
             return;
         }
 
-        try {
-            if (path.toLowerCase().endsWith(".gif")) {
-                Animation<TextureRegion> gifAnim = GifDecoder.loadGIFAnimation(Animation.PlayMode.LOOP,
-                        Gdx.files.internal(path).read());
-                if (gifAnim != null) {
-                    if (isPlayer) {
-                        playerAnimation = gifAnim;
-                        if (gifAnim.getKeyFrames().length > 0)
-                            pokemonPlayerTexture = gifAnim.getKeyFrames()[0].getTexture();
-                    } else {
-                        enemyAnimation = gifAnim;
-                        if (gifAnim.getKeyFrames().length > 0)
-                            pokemonEnemyTexture = gifAnim.getKeyFrames()[0].getTexture();
-                    }
-                    return;
-                }
-            }
-
-            // Check for multi-file animation (separated by ;)
-            if (path.contains(";")) {
-                String[] paths = path.split(";");
-                Array<TextureRegion> frames = new Array<>();
-                Texture firstTexture = null;
-
-                for (int i = 0; i < paths.length; i++) {
-                    Texture tex = new Texture(Gdx.files.internal(paths[i].trim()));
-                    frames.add(new TextureRegion(tex));
-                    if (i == 0)
-                        firstTexture = tex;
-                }
-
-                Animation<TextureRegion> anim = new Animation<>(0.5f, frames, Animation.PlayMode.LOOP);
-
+        if (path.toLowerCase().endsWith(".gif")) {
+            Animation<TextureRegion> gifAnim = GifDecoder.loadGIFAnimation(Animation.PlayMode.LOOP,
+                    Gdx.files.internal(path).read());
+            if (gifAnim != null) {
                 if (isPlayer) {
-                    playerAnimation = anim;
-                    pokemonPlayerTexture = firstTexture; // Keep reference to avoid immediate disposal issues if needed,
-                                                         // though we draw animation
+                    playerAnimation = gifAnim;
+                    pokemonPlayerTexture = gifAnim.getKeyFrame(0).getTexture();
                 } else {
-                    enemyAnimation = anim;
-                    pokemonEnemyTexture = firstTexture;
+                    enemyAnimation = gifAnim;
+                    pokemonEnemyTexture = gifAnim.getKeyFrame(0).getTexture();
                 }
                 return;
             }
+        }
 
-            Texture tempTexture = new Texture(Gdx.files.internal(path));
+        if (path.contains(";")) {
+            String[] paths = path.split(";");
+            Array<TextureRegion> frames = new Array<>();
+            Texture firstTexture = null;
 
-            // Check for strip animation (Heuristic: Width >= Height * 2)
-            if (tempTexture.getWidth() >= tempTexture.getHeight() * 2) {
-                int frameHeight = tempTexture.getHeight();
-                int frameWidth = frameHeight; // Assume square frames
-                int frameCount = tempTexture.getWidth() / frameWidth;
-
-                TextureRegion[][] tmp = TextureRegion.split(tempTexture, frameWidth, frameHeight);
-                TextureRegion[] frames = new TextureRegion[frameCount];
-                for (int i = 0; i < frameCount; i++) {
-                    frames[i] = tmp[0][i];
-                }
-
-                Animation<TextureRegion> anim = new Animation<>(0.15f, frames);
-                anim.setPlayMode(Animation.PlayMode.LOOP);
-
-                if (isPlayer) {
-                    playerAnimation = anim;
-                    pokemonPlayerTexture = tempTexture;
-                } else {
-                    enemyAnimation = anim;
-                    pokemonEnemyTexture = tempTexture;
-                }
-            } else {
-                if (isPlayer)
-                    pokemonPlayerTexture = tempTexture;
-                else
-                    pokemonEnemyTexture = tempTexture;
+            for (int i = 0; i < paths.length; i++) {
+                Texture tex = new Texture(Gdx.files.internal(paths[i].trim()));
+                frames.add(new TextureRegion(tex));
+                if (i == 0)
+                    firstTexture = tex;
             }
 
-        } catch (Exception e) {
-            Gdx.app.error("ScreenBatalla", "Sprite no encontrado/Error al cargar: " + path + " - " + e.getMessage());
+            Animation<TextureRegion> anim = new Animation<>(0.5f, frames, Animation.PlayMode.LOOP);
+
+            if (isPlayer) {
+                playerAnimation = anim;
+                pokemonPlayerTexture = firstTexture;
+            } else {
+                enemyAnimation = anim;
+                pokemonEnemyTexture = firstTexture;
+            }
+            return;
+        }
+
+        Texture tempTexture = new Texture(Gdx.files.internal(path));
+
+        if (tempTexture.getWidth() >= tempTexture.getHeight() * 2) {
+            int frameHeight = tempTexture.getHeight();
+            int frameWidth = frameHeight;
+            int frameCount = tempTexture.getWidth() / frameWidth;
+
+            TextureRegion[][] tmp = TextureRegion.split(tempTexture, frameWidth, frameHeight);
+            TextureRegion[] frames = new TextureRegion[frameCount];
+            for (int i = 0; i < frameCount; i++) {
+                frames[i] = tmp[0][i];
+            }
+
+            Animation<TextureRegion> anim = new Animation<>(0.15f, frames);
+            anim.setPlayMode(Animation.PlayMode.LOOP);
+
+            if (isPlayer) {
+                playerAnimation = anim;
+                pokemonPlayerTexture = tempTexture;
+            } else {
+                enemyAnimation = anim;
+                pokemonEnemyTexture = tempTexture;
+            }
+        } else {
             if (isPlayer)
-                pokemonPlayerTexture = createPlaceholderTexture(Color.BLUE);
+                pokemonPlayerTexture = tempTexture;
             else
-                pokemonEnemyTexture = createPlaceholderTexture(Color.RED);
+                pokemonEnemyTexture = tempTexture;
         }
     }
 

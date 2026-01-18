@@ -4,21 +4,19 @@ import com.badlogic.gdx.math.Rectangle;
 import java.util.List;
 import java.util.ArrayList;
 
-/**
- * Representa un área invisible en el mapa donde pueden ocurrir encuentros con Pokémon.
- * Los Pokémon no son visibles, solo se activa la batalla al entrar en contacto.
- */
+//Representa un área invisible en el mapa donde pueden ocurrir encuentros pokemón
 public class EncounterZone {
     private Rectangle bounds;
-    private List<String> possiblePokemon; // Lista de nombres de Pokémon que pueden aparecer
-    private float encounterRate; // Probabilidad de encuentro (0.0 a 1.0)
-    private boolean isActive; // Si la zona está activa (puede generar encuentros)
-    private String name; // Nombre identificador de la zona
+    private List<String> possiblePokemon; // Lista de nombres de pokemón que pueden aparecer
+    private float encounterRate;
+    private boolean isActive;
+    private String name;
 
     public EncounterZone(float x, float y, float width, float height, String name) {
         this.bounds = new Rectangle(x, y, width, height);
         this.possiblePokemon = new ArrayList<>();
-        this.encounterRate = 0.3f; // 30% de probabilidad por defecto
+        this.encounterRate = 0.3f; // Se establece un 30% de probabilidad por defecto, luego se cambia este valor
+                                   // dependiendo del pokemón que aparezca
         this.isActive = true;
         this.name = name;
     }
@@ -57,18 +55,12 @@ public class EncounterZone {
         return name;
     }
 
-    /**
-     * Verifica si un punto (jugador) está dentro de esta zona de encuentro.
-     */
+    // Verifica si el jugador está en un tile de aparición
     public boolean contains(float x, float y) {
         return bounds.contains(x, y);
     }
 
-    /**
-     * Verifica si un rectángulo (jugador) se superpone con esta zona.
-     */
     public boolean overlaps(Rectangle playerBounds) {
         return bounds.overlaps(playerBounds);
     }
 }
-

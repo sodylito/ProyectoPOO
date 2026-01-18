@@ -36,26 +36,21 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
-import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
-// --- IMPORTACIONES DE CLASES DEL PAQUETE 'clases' ---
 import sodyl.proyecto.clases.Inventario;
 import sodyl.proyecto.clases.Objeto;
 import sodyl.proyecto.clases.Objeto.Recipe;
 import sodyl.proyecto.clases.Pokemon;
 import sodyl.proyecto.clases.Pokemones;
-// ASUME la existencia de la clase Collectible
-// ----------------------------------------------------
 import sodyl.proyecto.networking.ConexionCliente;
-import sodyl.proyecto.clases.PlayerData;
-import com.badlogic.gdx.utils.Json;
 import com.badlogic.gdx.utils.JsonValue;
 import com.badlogic.gdx.utils.JsonReader;
+import sodyl.proyecto.networking.SharedResourceManager;
+import sodyl.proyecto.networking.DuelManager;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -68,37 +63,55 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Arrays;
-import java.util.function.Supplier;
 import static com.badlogic.gdx.Input.Keys;
 
+//CLASE QUE MANEJA EL JUEGO
 public class ScreenMapaTiled implements Screen, InputProcessor {
 
-    protected final Proyecto game;
-    private final String initialPokemonName; // si no es null, se usa para inicializar playerPokemon
+    protected final Proyecto game; // Instancia de la clase Proyecto
+    private final String initialPokemonName;
     protected Stage stage;
-    public Stage uiStage; // public para acceso desde ScreenBatalla
+    public Stage uiStage;
     protected OrthographicCamera camera;
 
-    // --- NETWORKING ---
     protected ConexionCliente conexion;
     protected boolean isMultiplayer = false;
     protected Map<String, OtherPlayer> otherPlayers = new HashMap<>();
     protected float syncTimer = 0;
-    protected static final float SYNC_INTERVAL = 0.05f; // Enviar posición cada 50ms
+    protected static final float SYNC_INTERVAL = 0.05f;
+    protected SharedResourceManager sharedResourceManager;
+    protected DuelManager duelManager;
+    protected Long multiplayerSeed = null;
+    private String serverIP = "localhost";
 
-    // Inner class to represent other players in the game
-    protected class OtherPlayer {
+    public class OtherPlayer {
         public Image actor;
         public String id;
 
         public OtherPlayer(String id, float x, float y, Direction direction, boolean isMoving) {
             this.id = id;
-            // Create actor for this player
-            TextureRegion frame = walkDownAnimation.getKeyFrame(0);
+            // Create actor for this player (asegurar que animaciones existen)
+            TextureRegion frame = (walkDownAnimation != null) ? walkDownAnimation.getKeyFrame(0) : null;
+            if (frame == null) {
+                // Fallback texture if animation not loaded yet
+                Pixmap pixmap = new Pixmap(32, 32, Pixmap.Format.RGBA8888);
+                pixmap.setColor(Color.CYAN);
+                pixmap.fill();
+                frame = new TextureRegion(new Texture(pixmap));
+                pixmap.dispose();
+            }
+
             this.actor = new Image(frame);
             this.actor.setSize(2f, 2f);
             this.actor.setPosition(x, y);
-            stage.addActor(this.actor);
+
+            // Solo añadir al stage si ya existe
+            if (stage != null) {
+                stage.addActor(this.actor);
+                Gdx.app.log("MULTI", "OtherPlayer added to stage: " + id + " at " + x + "," + y);
+            } else {
+                Gdx.app.error("MULTI", "CRITICAL: Stage is null when creating OtherPlayer " + id);
+            }
         }
 
         public void update(float x, float y, Direction direction, boolean isMoving) {
@@ -107,50 +120,81 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
             if (isMoving) {
                 // UNIDAD 3: POLIMORFISMO DE SUBTIPOS Y ENUMERACIONES
-                // El comportamiento cambia según la dirección, demostrando cómo
-                // una lógica centralizada puede gestionar diferentes estados.
                 switch (direction) {
                     case UP:
-                        currentFrame = walkUpAnimation.getKeyFrame(stateTime, true);
+                        currentFrame = (walkUpAnimation != null) ? walkUpAnimation.getKeyFrame(stateTime, true) : null;
                         break;
                     case DOWN:
-                        currentFrame = walkDownAnimation.getKeyFrame(stateTime, true);
+                        currentFrame = (walkDownAnimation != null) ? walkDownAnimation.getKeyFrame(stateTime, true)
+                                : null;
                         break;
                     case LEFT:
-                        currentFrame = walkLeftAnimation.getKeyFrame(stateTime, true);
+                        currentFrame = (walkLeftAnimation != null) ? walkLeftAnimation.getKeyFrame(stateTime, true)
+                                : null;
                         break;
                     case RIGHT:
-                        currentFrame = walkRightAnimation.getKeyFrame(stateTime, true);
+                        currentFrame = (walkRightAnimation != null) ? walkRightAnimation.getKeyFrame(stateTime, true)
+                                : null;
                         break;
                     default:
-                        currentFrame = walkDownAnimation.getKeyFrame(stateTime, true);
+                        currentFrame = (walkDownAnimation != null) ? walkDownAnimation.getKeyFrame(stateTime, true)
+                                : null;
                         break;
                 }
             } else {
                 switch (direction) {
                     case UP:
-                        currentFrame = walkUpAnimation.getKeyFrame(0);
+                        currentFrame = (walkUpAnimation != null) ? walkUpAnimation.getKeyFrame(0) : null;
                         break;
                     case DOWN:
-                        currentFrame = walkDownAnimation.getKeyFrame(0);
+                        currentFrame = (walkDownAnimation != null) ? walkDownAnimation.getKeyFrame(0) : null;
                         break;
                     case LEFT:
-                        currentFrame = walkLeftAnimation.getKeyFrame(0);
+                        currentFrame = (walkLeftAnimation != null) ? walkLeftAnimation.getKeyFrame(0) : null;
                         break;
                     case RIGHT:
-                        currentFrame = walkRightAnimation.getKeyFrame(0);
+                        currentFrame = (walkRightAnimation != null) ? walkRightAnimation.getKeyFrame(0) : null;
                         break;
                     default:
-                        currentFrame = walkDownAnimation.getKeyFrame(0);
+                        currentFrame = (walkDownAnimation != null) ? walkDownAnimation.getKeyFrame(0) : null;
                         break;
                 }
             }
-            this.actor.setDrawable(new TextureRegionDrawable(currentFrame));
+
+            if (currentFrame != null) {
+                this.actor.setDrawable(new TextureRegionDrawable(currentFrame));
+            }
         }
 
         public void remove() {
             if (actor != null)
                 actor.remove();
+        }
+    }
+
+    // Método público para actualizar jugadores desde ScreenMultiplayer
+    public void updateOtherPlayer(String id, float x, float y, String dirStr, boolean moving) {
+        Gdx.app.log("MULTI", "Actualizando jugador " + id + " a " + x + "," + y + " dir=" + dirStr + " move=" + moving);
+        Direction dir = Direction.DOWN;
+        try {
+            dir = Direction.valueOf(dirStr);
+        } catch (Exception e) {
+            dir = Direction.DOWN;
+        }
+
+        if (!otherPlayers.containsKey(id)) {
+            Gdx.app.log("MULTI", "Creando nuevo actor para " + id);
+            OtherPlayer nuevo = new OtherPlayer(id, x, y, dir, moving);
+            otherPlayers.put(id, nuevo);
+        } else {
+            otherPlayers.get(id).update(x, y, dir, moving);
+        }
+    }
+
+    public void removeOtherPlayer(String id) {
+        if (otherPlayers.containsKey(id)) {
+            otherPlayers.get(id).remove();
+            otherPlayers.remove(id);
         }
     }
 
@@ -169,7 +213,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     protected Direction lastDirection = Direction.DOWN;
     protected Image characterActor;
 
-    protected static final float SPEED = 150f;
+    protected static final float SPEED = 80f;
     protected boolean movingUp, movingDown, movingLeft, movingRight;
     protected static final float UNIT_SCALE = 1 / 8f;
 
@@ -279,6 +323,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private Table choiceBoxTable;
     private int selectedChoiceIndex = 0;
     private Runnable onDialogCompleteAction;
+    private Runnable onYesAction;
+    private Runnable onNoAction;
 
     // Track source map when entering Pokemon Center
     private String sourceMapBeforePokemonCenter = null;
@@ -618,9 +664,30 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     public ScreenMapaTiled(Proyecto game, boolean isMultiplayer) {
+        this(game, "localhost", isMultiplayer);
+    }
+
+    public ScreenMapaTiled(Proyecto game, String serverIP, boolean isMultiplayer) {
         this(game);
+        this.serverIP = (serverIP == null || serverIP.isEmpty()) ? "localhost" : serverIP;
         this.isMultiplayer = isMultiplayer;
         if (isMultiplayer) {
+            this.currentState = GameState.FREE_ROAMING;
+            initNetworking();
+        }
+    }
+
+    public ScreenMapaTiled(Proyecto game, boolean isMultiplayer, long seed) {
+        this(game, "localhost", isMultiplayer, seed);
+    }
+
+    public ScreenMapaTiled(Proyecto game, String serverIP, boolean isMultiplayer, long seed) {
+        this(game);
+        this.serverIP = (serverIP == null || serverIP.isEmpty()) ? "localhost" : serverIP;
+        this.isMultiplayer = isMultiplayer;
+        this.multiplayerSeed = seed;
+        if (isMultiplayer) {
+            this.currentState = GameState.FREE_ROAMING;
             initNetworking();
         }
     }
@@ -663,6 +730,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         if (playerPokemon != null)
             this.playerPokemon = playerPokemon;
 
+        if (this.isMultiplayer) {
+            initNetworking();
+        }
     }
 
     // UNIDAD 9: PATRÓN OBSERVER / NETWORKING
@@ -670,7 +740,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     // que el servidor envíe un mensaje. Esto es una forma de implementar el patrón
     // Observer.
     private void initNetworking() {
-        String serverIP = "localhost";
+        Gdx.app.log("NETWORK", "Iniciando red en IP: " + serverIP);
         conexion = new ConexionCliente(serverIP, 5000, message -> {
             // UNIDAD 7: CONCURRENCIA E HILOS
             // Los mensajes de red llegan en un hilo secundario de red.
@@ -679,6 +749,68 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             // para evitar errores de sincronización gráfica (Thread Safety).
             Gdx.app.postRunnable(() -> handleNetworkMessage(message));
         });
+
+        sharedResourceManager = new SharedResourceManager();
+        duelManager = new DuelManager(conexion, new DuelManager.DuelUIListener() {
+            @Override
+            public void onDuelRequested(String challengerId) {
+                Gdx.app.postRunnable(() -> {
+                    dialogueQueue.clear();
+                    dialogueQueue.add("¡" + challengerId + " te ha retado a un duelo!");
+                    dialogueQueue.add("¿Aceptas el desafío?");
+                    currentState = GameState.DIALOGUE;
+                    dialogBox.setText(dialogueQueue.poll());
+                    onDialogCompleteAction = () -> {
+                        showYesNoChoice("Aceptar", "Rechazar", () -> {
+                            duelManager.acceptDuel(challengerId, playerPokemon);
+                        }, () -> {
+                            // Reject logic (optional)
+                        });
+                    };
+                });
+            }
+
+            @Override
+            public void onDuelAccepted() {
+                Gdx.app.postRunnable(() -> {
+                    dialogueQueue.clear();
+                    dialogueQueue.add("¡Duelo aceptado! ¡Prepárate!");
+                    currentState = GameState.DIALOGUE;
+                    dialogBox.setText(dialogueQueue.poll());
+                });
+            }
+
+            @Override
+            public void onDuelUpdate(String log) {
+                Gdx.app.postRunnable(() -> {
+                    if (dialogueQueue == null)
+                        dialogueQueue = new LinkedList<>();
+                    dialogueQueue.add(log);
+                    if (currentState != GameState.DIALOGUE) {
+                        currentState = GameState.DIALOGUE;
+                        if (dialogBox != null)
+                            dialogBox.setText(dialogueQueue.poll());
+                    }
+                });
+            }
+
+            @Override
+            public void onDuelEnd(boolean won) {
+                Gdx.app.postRunnable(() -> {
+                    if (won) {
+                        dialogueQueue.add("¡Has ganado el duelo!");
+                        dialogueQueue.add("Tu " + playerPokemon.getEspecie() + " gana +1 punto de progreso.");
+                        // Implement reward logic here if strictly needed or server handles it
+                    } else {
+                        dialogueQueue.add("Has perdido el duelo...");
+                    }
+                    currentState = GameState.DIALOGUE;
+                    if (dialogBox != null && !dialogueQueue.isEmpty())
+                        dialogBox.setText(dialogueQueue.poll());
+                });
+            }
+        });
+
         conexion.conectar();
     }
 
@@ -691,21 +823,42 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             if (id.equals(sodyl.proyecto.clases.UserManager.getCurrentUser()))
                 return;
 
+            Gdx.app.log("NETWORK", "Mensaje recibido: " + tipo + " de " + id);
+
             if ("mover".equals(tipo)) {
                 float x = root.getFloat("x");
                 float y = root.getFloat("y");
-                Direction dir = Direction.valueOf(root.getString("dir", "DOWN"));
+                String dirStr = root.getString("dir", "DOWN");
                 boolean moving = root.getBoolean("moving", false);
 
-                if (!otherPlayers.containsKey(id)) {
-                    otherPlayers.put(id, new OtherPlayer(id, x, y, dir, moving));
-                } else {
-                    otherPlayers.get(id).update(x, y, dir, moving);
-                }
+                updateOtherPlayer(id, x, y, dirStr, moving);
             } else if ("desconectar".equals(tipo)) {
-                if (otherPlayers.containsKey(id)) {
-                    otherPlayers.get(id).remove();
-                    otherPlayers.remove(id);
+                removeOtherPlayer(id);
+            } else if (tipo.startsWith("duel_")) {
+                // Duel messages handled by manager
+                // Parse minimal needed info or pass raw? DuelManager parses structure?
+                // Let's modify DuelManager to parse or pass components.
+                // Assuming DuelManager processMessage takes components.
+                // We need to extract specific fields if DuelManager expects them.
+                // Or we can let DuelManager parse the whole JSON if we passed the object.
+                // For now, let's extract 'target' as senderId and 'damage' if present.
+                String sender = root.has("id") ? root.getString("id")
+                        : (root.has("target") ? root.getString("target") : "");
+                float dmg = root.has("damage") ? root.getFloat("damage") : 0;
+                duelManager.processMessage(tipo, sender, dmg);
+
+            } else if ("item_collected".equals(tipo)) {
+                String itemId = root.getString("itemId", "");
+                if (!itemId.isEmpty()) {
+                    sharedResourceManager.markResourceDepleted(itemId);
+                    // Remove from screen if visible
+                    for (Collectible c : collectibles) {
+                        String cId = mapPath + "_" + (int) c.getActor().getX() + "_" + (int) c.getActor().getY();
+                        if (cId.equals(itemId) && !c.isCollected()) {
+                            c.setCollected(true);
+                            Gdx.app.log("MULTI", "Recurso agotado por otro jugador: " + itemId);
+                        }
+                    }
                 }
             }
         } catch (Exception e) {
@@ -806,7 +959,13 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         batch = new SpriteBatch();
         shapeRenderer = new com.badlogic.gdx.graphics.glutils.ShapeRenderer();
         camera = new OrthographicCamera();
-        random = new Random();
+
+        if (isMultiplayer && multiplayerSeed != null) {
+            random = new Random(multiplayerSeed);
+            Gdx.app.log("RANDOM", "Inicializado con semilla compartida: " + multiplayerSeed);
+        } else {
+            random = new Random();
+        }
 
         // --- Carga de Datos ---
         if (playerInventory == null) {
@@ -836,7 +995,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         generator.dispose(); // Liberar el generador después de crear la fuente
 
         try {
-            map = new TmxMapLoader().load(mapPath);
+            // Create TmxMapLoader with custom parameters to properly resolve tileset images
+            TmxMapLoader.Parameters params = new TmxMapLoader.Parameters();
+            params.textureMinFilter = Texture.TextureFilter.Nearest;
+            params.textureMagFilter = Texture.TextureFilter.Nearest;
+
+            map = new TmxMapLoader().load(mapPath, params);
             renderer = new OrthogonalTiledMapRenderer(map, UNIT_SCALE);
             mapWidthTiles = map.getProperties().get("width", Integer.class);
             mapHeightTiles = map.getProperties().get("height", Integer.class);
@@ -904,7 +1068,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             Gdx.app.log("COLLISION", "No se encontró capa de OBJETOS de colisión en el mapa");
         }
 
-        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+        if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
             // Ensure transition tile is free (Pokemon Center)
             removeCollisionsAt(38, 37);
             removeCollisionsAt(39, 37);
@@ -921,6 +1085,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         TextureRegion initialFrame;
         try {
             atlas = new TextureAtlas(Gdx.files.internal("sprites/jugador/Textures.atlas"));
+            for (Texture t : atlas.getTextures()) {
+                t.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+            }
             float frameDuration = 0.15f;
             walkDownAnimation = createAnimation("r1", frameDuration);
             walkLeftAnimation = createAnimation("r2", frameDuration);
@@ -950,7 +1117,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         } else if (mapPath.contains("Centro Pokemon interior")) {
             startX = 11f; // Adjusted to center the map view
             startY = 4f; // Spawn at lower tile, exit is above
-        } else if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+        } else if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
             // Spawn at tile 51, 18
             float tileWidth = map.getProperties().get("tilewidth", Integer.class);
             float tileHeight = map.getProperties().get("tileheight", Integer.class);
@@ -1004,8 +1171,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 // If not in team, create it (Fallback/New)
                 if (playerPokemon == null) {
                     playerPokemon = Pokemones.getPokemon(this.initialPokemonName);
-                    playerPokemon.setNivel(0);
-                    playerPokemon.actualizarAtributos();
+                    if (playerPokemon != null) {
+                        playerPokemon.setNivel(0);
+                        playerPokemon.actualizarAtributos();
+                    }
                 }
             } else {
                 // No specific request, take first from team or default
@@ -1076,7 +1245,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         } else {
             collectibles = new Array<>();
             game.getMapCollectibles().put(mapPath, collectibles);
-            if (!mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+            if (!(mapPath != null && mapPath.contains("MAPACOMPLETO.tmx"))) {
                 spawnCollectiblesOnGrassTiles(100);
             } else {
                 spawnPrimaryMaterialsInZones(20);
@@ -1092,6 +1261,20 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
 
         stage.addActor(characterActor);
+
+        // --- MULTIPLAYER: Añadir jugadores que se conectaron antes de show() ---
+        if (otherPlayers != null) {
+            for (OtherPlayer op : otherPlayers.values()) {
+                if (op.actor.getStage() == null) {
+                    stage.addActor(op.actor);
+                }
+                // Si se creó antes de cargar el atlas, actualizar su textura
+                if (walkDownAnimation != null && op.actor.getDrawable() == null) {
+                    op.actor.setDrawable(new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                            walkDownAnimation.getKeyFrame(0)));
+                }
+            }
+        }
 
         // --- INICIALIZAR MENÚ DE PAUSA, DIÁLOGO, CRAFTEO E INVENTARIO ---
         initializeDialogueNPCs();
@@ -1121,7 +1304,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         multiplexer.addProcessor(this);
         multiplexer.addProcessor(uiStage);
 
-        if (currentState == GameState.DIALOGUE && mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+        if (currentState == GameState.DIALOGUE && !isMultiplayer && mapPath != null
+                && mapPath.contains("MAPACOMPLETO.tmx")) {
             // Check if it's the very first dialogue (Professor Yoel intro)
             // We can check if dialogueQueue is empty (it hasn't been filled yet) or just by
             // context
@@ -1145,12 +1329,14 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     private void loadBattleNPCs() {
-        if (!mapPath.equals("Mapa/MAPACOMPLETO.tmx"))
+        if (mapPath == null || !mapPath.contains("MAPACOMPLETO.tmx"))
             return;
 
         // Kaneki (Map 2, Tile 42, 39)
         kaneki1Texture = new Texture(Gdx.files.internal("spritesMapa2/kaneki1.png"));
+        kaneki1Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         kaneki2Texture = new Texture(Gdx.files.internal("spritesMapa2/kaneki2.png"));
+        kaneki2Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         kanekiImage = new Image(kaneki1Texture);
         kanekiImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
         kanekiImage.setPosition(41 * 16 * UNIT_SCALE, 38 * 16 * UNIT_SCALE);
@@ -1158,7 +1344,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // Jesucristo (Map 4, Tile 52, 49)
         jesucristo1Texture = new Texture(Gdx.files.internal("spritesMapa4/jesucristo1.png"));
+        jesucristo1Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         jesucristo2Texture = new Texture(Gdx.files.internal("spritesMapa4/jesucristo2.png"));
+        jesucristo2Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         jesucristoImage = new Image(jesucristo1Texture);
         jesucristoImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
         jesucristoImage.setPosition(50 * 16 * UNIT_SCALE, 50 * 16 * UNIT_SCALE);
@@ -1166,7 +1354,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // William Afton (Map 4, Tile 87, 51)
         afton1Texture = new Texture(Gdx.files.internal("spritesMapa4/afton1.png"));
+        afton1Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         afton2Texture = new Texture(Gdx.files.internal("spritesMapa4/afton2.png"));
+        afton2Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         aftonImage = new Image(afton1Texture);
         aftonImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
         aftonImage.setPosition(86 * 16 * UNIT_SCALE, 51 * 16 * UNIT_SCALE);
@@ -1174,7 +1364,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // Pennywise (Map 3, Tile 100, 26)
         pennywise1Texture = new Texture(Gdx.files.internal("spritesMapa3/pennywise1.png"));
+        pennywise1Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         pennywise2Texture = new Texture(Gdx.files.internal("spritesMapa3/pennywise2.png"));
+        pennywise2Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         pennywiseImage = new Image(pennywise1Texture);
         pennywiseImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
         pennywiseImage.setPosition(99 * 16 * UNIT_SCALE, 26 * 16 * UNIT_SCALE);
@@ -1182,7 +1374,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // Jotaro (Map 2, Tile 11, 27)
         jotaro1Texture = new Texture(Gdx.files.internal("spritesMapa2/jotaro1.png"));
+        jotaro1Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         jotaro2Texture = new Texture(Gdx.files.internal("spritesMapa2/jotaro2.png"));
+        jotaro2Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         jotaroImage = new Image(jotaro1Texture);
         jotaroImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
         jotaroImage.setPosition(10 * 16 * UNIT_SCALE, 27 * 16 * UNIT_SCALE);
@@ -1190,7 +1384,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // Don Valerio (Map 3, Tile 144, 22)
         donValerio1Texture = new Texture(Gdx.files.internal("spritesMapa3/donValerio1.png"));
+        donValerio1Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         donValerio2Texture = new Texture(Gdx.files.internal("spritesMapa3/donValerio2.png"));
+        donValerio2Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         donValerioImage = new Image(donValerio1Texture);
         donValerioImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
         donValerioImage.setPosition(143 * 16 * UNIT_SCALE, 22 * 16 * UNIT_SCALE);
@@ -1198,7 +1394,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         // Giorno (Map 2, Tile 28, 38)
         giorno1Texture = new Texture(Gdx.files.internal("spritesMapa2/giorno1.png"));
+        giorno1Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         giorno2Texture = new Texture(Gdx.files.internal("spritesMapa2/giorno2.png"));
+        giorno2Texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         giornoImage = new Image(giorno1Texture);
         giornoImage.setSize(45 * UNIT_SCALE, 24 * UNIT_SCALE);
         giornoImage.setPosition(27 * 16 * UNIT_SCALE, 38 * 16 * UNIT_SCALE);
@@ -1217,7 +1415,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     private void initializeDialogueNPCs() {
-        if (!mapPath.equals("Mapa/MAPACOMPLETO.tmx"))
+        if (!(mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")))
             return;
 
         // Bonnie (30, 26)
@@ -1440,11 +1638,18 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         int tileY = (int) (playerY / (layer.getTileHeight() * UNIT_SCALE));
 
         // --- LÓGICA DE ENCUENTROS ESPECIALES (POR COORDENADAS) ---
-        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
-            if (!checkTeamHealth())
+        if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
+            if (!checkTeamHealth()) {
+                Gdx.app.log("ENCOUNTER_DEBUG", "No hay Pokémon con salud para encuentros. Debes curarlos.");
                 return; // No iniciar encuentros si no hay salud
+            }
 
             String coordKey = tileX + "," + tileY;
+
+            // Log para depuración (solo se muestra cuando el jugador se mueve a un tile
+            // sospechoso)
+            // Gdx.app.log("SPAWN_DEBUG", "Coordenadas: " + coordKey);
+
             if (SPECIAL_ENCOUNTER_TILES_MAP1.contains(coordKey)) {
                 if (random.nextFloat() < 0.05f) {
 
@@ -1547,6 +1752,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         if (playerPokemon == null)
             return;
 
+        // Desactivar encuentros temporalmente para evitar loops
+        canTriggerEncounter = false;
+        encounterCooldown = 0f;
+
         List<String> pool = new ArrayList<>();
         if (zoneNumber == 1) {
             // Zona 1 (Rowlet, Ivysaur, Pikachu, Serperior)
@@ -1604,7 +1813,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         List<String> pool = new ArrayList<>();
 
         // Determine which map we're on
-        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+        if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
             // MAPA 1 (PRINCIPAL)
             // Común: 100 copias
             addCopies(pool, "Rowlet", 100);
@@ -2198,7 +2407,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     protected void spawnPrimaryMaterialsInZones(int itemsPerType) {
-        if (!mapPath.equals("Mapa/MAPACOMPLETO.tmx"))
+        if (!(mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")))
             return;
 
         final int TILE_WIDTH = map.getProperties().get("tilewidth", Integer.class);
@@ -2338,8 +2547,13 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         clearMovementKeys();
 
         if (isArceusDialogue) {
-            showChoiceBox();
-            currentState = GameState.WAITING_FOR_CHOICE;
+            showYesNoChoice("Sí", "No", () -> {
+                isArceusDialogue = false;
+                startArceusBattle();
+            }, () -> {
+                isArceusDialogue = false;
+                currentState = GameState.FREE_ROAMING;
+            });
             return;
         }
 
@@ -3149,6 +3363,22 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         if (currentState == GameState.FREE_ROAMING) {
             handleMovement(delta);
 
+            // --- SINCRONIZACIÓN MULTIJUGADOR ---
+            if (isMultiplayer && conexion != null) {
+                syncTimer += delta;
+                if (syncTimer >= SYNC_INTERVAL) {
+                    syncTimer = 0;
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("tipo", "mover");
+                    data.put("id", sodyl.proyecto.clases.UserManager.getCurrentUser());
+                    data.put("x", characterActor.getX());
+                    data.put("y", characterActor.getY());
+                    data.put("dir", lastDirection.toString());
+                    data.put("moving", (movingUp || movingDown || movingLeft || movingRight));
+                    conexion.enviar(data);
+                }
+            }
+
             // --- LÓGICA DE RESPAWN DE OBJETOS ---
             if (collectibles != null) {
                 for (Collectible c : collectibles) {
@@ -3195,7 +3425,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         camera.update();
 
         // Update NPC animations (Looping every 0.5s per frame)
-        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+        if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
             npcAnimationTimer += delta;
             if (npcAnimationTimer >= NPC_FRAME_DURATION * 2) {
                 npcAnimationTimer = 0;
@@ -3369,7 +3599,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
     }
 
-    // Initialize ChoiceBox (Yes/No)
     private void initializeChoiceBox() {
         Texture darkBackground = createColoredTexture(new Color(0.1f, 0.1f, 0.1f, 0.9f));
         TextureRegionDrawable backgroundDrawable = new TextureRegionDrawable(darkBackground);
@@ -3378,38 +3607,11 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         choiceBoxTable.setBackground(backgroundDrawable);
         choiceBoxTable.pad(20);
 
-        // Position: Bottom Right, slightly above dialogue or custom
         choiceBoxTable.setSize(150, 100);
         choiceBoxTable.setPosition(uiStage.getWidth() - 170, 200);
 
         choiceBoxTable.setVisible(false);
         uiStage.addActor(choiceBoxTable);
-    }
-
-    // Show Yes/No options
-    private void showYesNoChoice() {
-        currentState = GameState.WAITING_FOR_CHOICE;
-        selectedChoiceIndex = 0;
-        choiceBoxTable.setVisible(true);
-        updateChoiceBox();
-    }
-
-    private void showChoiceBox() {
-        choiceBoxTable.setVisible(true);
-        selectedChoiceIndex = 0;
-        updateChoiceBox();
-    }
-
-    private void updateChoiceBox() {
-        choiceBoxTable.clearChildren();
-        Label.LabelStyle selectedStyle = new Label.LabelStyle(font, Color.YELLOW);
-        Label.LabelStyle normalStyle = new Label.LabelStyle(font, Color.WHITE);
-
-        Label yesLabel = new Label("Sí", (selectedChoiceIndex == 0) ? selectedStyle : normalStyle);
-        Label noLabel = new Label("No", (selectedChoiceIndex == 1) ? selectedStyle : normalStyle);
-
-        choiceBoxTable.add(yesLabel).pad(5).row();
-        choiceBoxTable.add(noLabel).pad(5).row();
     }
 
     private void handleChoiceInput(int keycode) {
@@ -3420,39 +3622,18 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             choiceBoxTable.setVisible(false);
             if (selectedChoiceIndex == 0) {
                 // SI
-                if (isArceusDialogue) {
-                    isArceusDialogue = false;
-                    choiceBoxTable.setVisible(false);
-                    startArceusBattle();
-                    return;
+                if (onYesAction != null) {
+                    onYesAction.run();
                 }
-
-                // SI - Curar todos los Pokemon del equipo
-                if (playerPokemon != null) {
-                    playerPokemon.restoreStatus();
-
-                    // También curar todos los Pokemon del equipo
-                    List<Pokemon> team = sodyl.proyecto.clases.Pokedex.getTeam();
-                    for (Pokemon p : team) {
-                        if (p != null) {
-                            p.restoreStatus();
-                        }
-                    }
-
-                    dialogueQueue.add("¡Tus Pokémon han sido restaurados exitosamente!");
-                } else {
-                    dialogueQueue.add("No tienes Pokémon para curar.");
-                }
-                currentState = GameState.DIALOGUE;
-                processNextDialogueLine();
             } else {
                 // NO
-                if (isArceusDialogue) {
-                    isArceusDialogue = false;
+                if (onNoAction != null) {
+                    onNoAction.run();
                 }
-                currentState = GameState.FREE_ROAMING;
             }
-
+            // Clear actions after execution
+            onYesAction = null;
+            onNoAction = null;
         }
     }
 
@@ -3587,7 +3768,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         int tileY = (int) ((nextY + playerHeight / 2) / (tileHeight * UNIT_SCALE));
 
         // Transition from Map 1 to Pokemon Center
-        if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+        if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
             if (tileX == 38 && tileY == 37) {
                 startTransitionToPokemonCenter(38, 36);
             } else if (tileX == 5 && tileY == 45) {
@@ -4100,7 +4281,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             int tileY = (int) (playerCenterY / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
 
             // --- BATTLE NPC INTERACTION ---
-            if (mapPath.equals("Mapa/MAPACOMPLETO.tmx")) {
+            if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
                 if (tileX >= 40 && tileX <= 42 && tileY >= 37 && tileY <= 39) {
                     if (game.getDefeatedNPCs().contains("Kaneki")) {
                         showArceusChallenge("Kaneki",
@@ -4196,7 +4377,17 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             for (int i = collectibles.size - 1; i >= 0; i--) {
                 Collectible collectible = collectibles.get(i);
 
-                if (!collectible.isCollected() && collectible.isInRange(playerCenterX, playerCenterY)) {
+                // Check shared resource manager if multiplayer
+                boolean isAvailable = true;
+                if (isMultiplayer && sharedResourceManager != null) {
+                    String cId = mapPath + "_" + (int) collectible.getActor().getX() + "_"
+                            + (int) collectible.getActor().getY();
+                    if (!sharedResourceManager.isResourceAvailable(cId)) {
+                        isAvailable = false;
+                    }
+                }
+
+                if (!collectible.isCollected() && isAvailable && collectible.isInRange(playerCenterX, playerCenterY)) {
 
                     int itemId = collectible.getItemId();
                     int quantityToCollect = collectible.getQuantity();
@@ -4205,6 +4396,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     int collectedQuantity = quantityToCollect - overflow;
 
                     if (collectedQuantity > 0) {
+
                         if (dialogueQueue == null) {
                             dialogueQueue = new LinkedList<>();
                         }
@@ -4218,6 +4410,21 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
                         collectible.setCollected(true);
 
+                        // Broadcast item collection in Multiplayer
+                        if (isMultiplayer && conexion != null) {
+                            // Deterministic ID: map_x_y
+                            String colId = mapPath + "_" + (int) collectible.getActor().getX() + "_"
+                                    + (int) collectible.getActor().getY();
+
+                            Map<String, Object> data = new HashMap<>();
+                            data.put("tipo", "item_collected");
+                            data.put("itemId", colId);
+                            data.put("id", sodyl.proyecto.clases.UserManager.getCurrentUser());
+                            conexion.enviar(data);
+
+                            sharedResourceManager.markResourceDepleted(colId); // Mark locally too
+                        }
+
                         collectedSomething = true;
                     } else {
                         if (dialogueQueue == null) {
@@ -4226,6 +4433,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                         dialogueQueue.add("Tu inventario está lleno (" + Inventario.MAX_QUANTITY + ") de "
                                 + Objeto.getObjeto(itemId).getNombre() + ". No puedes recoger más.");
                         collectedSomething = true;
+
                     }
 
                     break;
@@ -4323,8 +4531,40 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         }
 
-        return false;
+        // DUEL TRIGGER (Check 'F' key)
+        if (currentState == GameState.FREE_ROAMING && (keycode == Keys.F)) {
+            if (isMultiplayer && duelManager != null) {
 
+                // Find closest player
+                float closestDist = 3.0f * 16 * UNIT_SCALE; // 3 tiles
+                String targetId = null;
+                float px = characterActor.getX();
+                float py = characterActor.getY();
+
+                for (OtherPlayer op : otherPlayers.values()) {
+                    float dx = op.actor.getX() - px;
+                    float dy = op.actor.getY() - py;
+                    float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        targetId = op.id;
+                    }
+                }
+
+                if (targetId != null) {
+                    duelManager.requestDuel(targetId, playerPokemon);
+                    dialogueQueue.clear();
+                    dialogueQueue.add("Enviando desafío a " + targetId + "...");
+                    currentState = GameState.DIALOGUE;
+                    dialogBox.setText(dialogueQueue.poll());
+                } else {
+                    Gdx.app.log("DUEL", "No hay jugadores cerca para retar.");
+                }
+                return true;
+            }
+        }
+
+        return false;
     }
 
     @Override
@@ -4578,6 +4818,78 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         attacksMenuTable.pad(50);
         attacksMenuTable.setVisible(false);
         uiStage.addActor(attacksMenuTable);
+    }
+
+    private void showYesNoChoice() {
+        showYesNoChoice("Sí", "No", () -> {
+            // Success: Heal
+            if (playerPokemon != null) {
+                playerPokemon.restoreStatus();
+                for (Pokemon p : sodyl.proyecto.clases.Pokedex.getTeam()) {
+                    if (p != null)
+                        p.restoreStatus();
+                }
+                dialogueQueue.add("¡Tus Pokémon han sido curados!");
+            } else {
+                dialogueQueue.add("No tienes Pokémon para curar.");
+            }
+            dialogueQueue.add("¡Vuelve pronto!");
+            currentState = GameState.DIALOGUE;
+            processNextDialogueLine();
+        }, () -> {
+            dialogueQueue.add("Entendido. ¡Ten cuidado fuera!");
+            currentState = GameState.DIALOGUE;
+            processNextDialogueLine();
+        });
+    }
+
+    private void showYesNoChoice(String yesText, String noText, Runnable onYes, Runnable onNo) {
+        this.onYesAction = onYes;
+        this.onNoAction = onNo;
+        selectedChoiceIndex = 0;
+        choiceBoxTable.setVisible(true);
+        currentState = GameState.WAITING_FOR_CHOICE;
+        updateChoiceBox(yesText, noText);
+    }
+
+    private void updateChoiceBox() {
+        updateChoiceBox("Sí", "No");
+    }
+
+    private void updateChoiceBox(String yesText, String noText) {
+        choiceBoxTable.clearChildren();
+        Label.LabelStyle selectedStyle = new Label.LabelStyle(font, Color.YELLOW);
+        Label.LabelStyle normalStyle = new Label.LabelStyle(font, Color.WHITE);
+
+        Label yesLabel = new Label(yesText, (selectedChoiceIndex == 0) ? selectedStyle : normalStyle);
+        Label noLabel = new Label(noText, (selectedChoiceIndex == 1) ? selectedStyle : normalStyle);
+
+        // Click listeners for mouse support
+        yesLabel.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override
+            public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                choiceBoxTable.setVisible(false);
+                if (onYesAction != null)
+                    onYesAction.run();
+                onYesAction = null;
+                onNoAction = null;
+            }
+        });
+
+        noLabel.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override
+            public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                choiceBoxTable.setVisible(false);
+                if (onNoAction != null)
+                    onNoAction.run();
+                onYesAction = null;
+                onNoAction = null;
+            }
+        });
+
+        choiceBoxTable.add(yesLabel).pad(5).row();
+        choiceBoxTable.add(noLabel).pad(5).row();
+        choiceBoxTable.pack();
     }
 
     private void showPokemonesMenu() {
@@ -4953,6 +5265,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         for (Texture texture : itemTextures.values()) {
             texture.dispose();
         }
+        itemTextures.clear();
 
         // --- DISCONNECT NETWORKING ---
         if (isMultiplayer && conexion != null) {
@@ -4961,7 +5274,19 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             data.put("id", sodyl.proyecto.clases.UserManager.getCurrentUser());
             conexion.enviar(data);
             conexion.desconectar();
+            conexion = null;
         }
+
+        // Set references to null to allow for proper re-initialization in show()
+        batch = null;
+        stage = null;
+        uiStage = null;
+        camera = null;
+        renderer = null;
+        map = null;
+        font = null;
+        shapeRenderer = null;
+        dialogBox = null;
     }
 
 }

@@ -38,7 +38,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
     }
 
     @Override
-    public void show() {
+    public void show() { // Inicializa la pantalla de ayuda
         game.playMusic("musica/jumpUp.mp3");
         stage = new Stage(new FitViewport(Proyecto.PANTALLA_W, Proyecto.PANTALLA_H));
 
@@ -53,7 +53,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
         bgImage.setFillParent(true);
         stage.addActor(bgImage);
 
-        // Shadow Overlay for contrast
+        // Overlay de sombra para contraste
         com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1,
                 com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
         pixmap.setColor(new Color(0, 0, 0, 0.6f));
@@ -83,35 +83,33 @@ public class ScreenAyuda implements Screen, InputProcessor {
         generator.dispose();
 
         // Styles
-        // Styles
         LabelStyle titleStyle = new LabelStyle(fontTitle, Color.RED);
         LabelStyle headerStyle = new LabelStyle(fontText, Color.RED);
         LabelStyle textStyle = new LabelStyle(fontText, Color.WHITE);
 
         TextButtonStyle btnStyle = new TextButtonStyle();
         btnStyle.font = fontText;
-        // Modificado para que siempre parezca "presionado" o seleccionado (Amarillo)
-        btnStyle.fontColor = Color.YELLOW; // Botón "Volver" sigue siendo amarillo para destacar
+        btnStyle.fontColor = Color.YELLOW;
         btnStyle.downFontColor = Color.ORANGE;
         btnStyle.overFontColor = Color.YELLOW;
 
-        // Content Table
+        // Tabla principal
         Table mainTable = new Table();
         mainTable.setFillParent(true);
         mainTable.pad(20);
 
-        // Title
+        // Titulo
         Label titleLabel = new Label("AYUDA Y REGLAS", titleStyle);
         mainTable.add(titleLabel).padBottom(20).row();
 
-        // Content Table for ScrollPane
+        // Tabla de contenido
         Table contentTable = new Table();
         contentTable.top().left();
         contentTable.pad(20);
 
         float textWidth = Proyecto.PANTALLA_W * 0.75f;
 
-        // 1. ¿QUÉ ES ESTE JUEGO?
+        // Introducción
         contentTable.add(new Label("¿QUÉ ES ESTE JUEGO?", headerStyle)).padBottom(10).left().row();
         String introText = "Este es un juego de aventura y estrategia donde exploras un mundo lleno de criaturas llamadas Pokémon. "
                 +
@@ -120,7 +118,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
         introLabel.setWrap(true);
         contentTable.add(introLabel).width(textWidth).padBottom(20).left().row();
 
-        // 2. CONTROLES
+        // Controles
         contentTable.add(new Label("CONTROLES BÁSICOS:", headerStyle)).padBottom(10).left().row();
         String controlesText = "- MOVERSE: Usa las FLECHAS del teclado para caminar por el mapa.\n" +
                 "- INTERACTUAR: Presiona Z o ENTER para hablar con personas o recoger objetos.\n" +
@@ -130,7 +128,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
         controlesLabel.setWrap(true);
         contentTable.add(controlesLabel).width(textWidth).padBottom(20).left().row();
 
-        // 3. EXPLORACIÓN Y OBJETIVOS
+        // Exploración y objetivos
         contentTable.add(new Label("EXPLORACIÓN Y OBJETIVOS:", headerStyle)).padBottom(10).left().row();
         String exploracionText = "1. BUSCA OBJETOS: Camina sobre flores o arbustos para encontrar ítems útiles.\n" +
                 "2. ENCUENTROS SALVAJES: Al caminar por zonas con flores, pueden aparecer Pokémon salvajes por sorpresa.\n"
@@ -140,7 +138,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
         exploracionLabel.setWrap(true);
         contentTable.add(exploracionLabel).width(textWidth).padBottom(20).left().row();
 
-        // 4. EL ARTE DEL COMBATE
+        // Sistema de combate
         contentTable.add(new Label("EL SISTEMA DE COMBATE:", headerStyle)).padBottom(10).left().row();
         String batallaText = "Las batallas se juegan por turnos. En tu turno puedes:\n" +
                 "- LUCHAR: Elige un ataque para reducir la vida (HP) del oponente.\n" +
@@ -151,7 +149,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
         batallaLabel.setWrap(true);
         contentTable.add(batallaLabel).width(textWidth).padBottom(20).left().row();
 
-        // 5. TIPOS Y ESTRATEGIA
+        // Tipos y estrategia
         contentTable.add(new Label("TIPOS Y ESTRATEGIA:", headerStyle)).padBottom(10).left().row();
         String tiposText = "Cada Pokémon tiene 'Tipos' (Fuego, Agua, Planta, etc.).\n" +
                 "- El Fuego vence a la Planta.\n" +
@@ -162,7 +160,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
         tiposLabel.setWrap(true);
         contentTable.add(tiposLabel).width(textWidth).padBottom(20).left().row();
 
-        // 6. ENTRENADORES Y NPCs
+        // Entrenadores y NPCs
         contentTable.add(new Label("ENTRENADORES (NPCs):", headerStyle)).padBottom(10).left().row();
         String npcText = "Encontrarás personas en el mundo. Algunos te darán consejos, pero otros te retarán a un combate.\n"
                 +
@@ -172,7 +170,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
         npcLabel.setWrap(true);
         contentTable.add(npcLabel).width(textWidth).padBottom(20).left().row();
 
-        // 7. CRECIMIENTO (NIVELES)
+        // Subir de nivel
         contentTable.add(new Label("SUBIR DE NIVEL:", headerStyle)).padBottom(10).left().row();
         String nivelText = "- Ganar combates aumenta el nivel de tu Pokémon, mejorando su daño y vida.\n" +
                 "- El nivel máximo es 10. ¡Un Pokémon nivel 10 es un 'Pokémon Superior'!\n" +
@@ -185,7 +183,7 @@ public class ScreenAyuda implements Screen, InputProcessor {
         scrollPane.setFadeScrollBars(false);
         mainTable.add(scrollPane).grow().width(Proyecto.PANTALLA_W * 0.85f).padBottom(20).row();
 
-        // Back Button
+        // Botón de regreso
         TextButton backButton = new TextButton("VOLVER (ESC)", btnStyle);
         backButton.addListener(new ChangeListener() {
             @Override

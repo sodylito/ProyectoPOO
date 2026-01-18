@@ -9,24 +9,18 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.Json;
 import com.badlogic.gdx.utils.JsonWriter;
 
-/**
- * Clase que gestiona los objetos que posee el jugador.
- */
+// Clase que gestiona los objetos que posee el jugador
 public class Inventario {
 
-    // Límite máximo de unidades que se pueden tener de CADA objeto.
+    // Límite máximo de unidades que se pueden tener de CADA objeto
     public static final int MAX_QUANTITY = 99;
-
-    // UNIDAD 10: COLECCIONES GENÉRICAS
-    // Map<Integer, Integer> utiliza Generics para asegurar que las claves y valores
-    // sean siempre números enteros, evitando errores de tipo en tiempo de
-    // ejecución.
-    private final Map<Integer, Integer> objetos; // ID del Objeto -> Cantidad
+    private final Map<Integer, Integer> objetos;
 
     public Inventario() {
         this.objetos = new HashMap<>();
     }
 
+    // Método para verificar si existe un inventario para un usuario
     public static boolean exists(String username) {
         if (username == null)
             return false;
@@ -40,37 +34,30 @@ public class Inventario {
     /**
      * Añade una cantidad de un objeto al inventario, respetando el límite máximo.
      * 
-     * @param id       ID del objeto a añadir.
-     * @param quantity Cantidad a añadir.
-     * @return La cantidad que NO se pudo añadir (desbordamiento). 0 si se añadió
-     *         todo.
+     * id es la ID del objeto a añadir.
+     * cantidad es la Cantidad a añadir.
+     * 
      */
-    public int addObjeto(int id, int quantity) {
+    public int addObjeto(int id, int cantidad) {
         int currentQuantity = objetos.getOrDefault(id, 0);
-        int newQuantity = currentQuantity + quantity;
+        int newQuantity = currentQuantity + cantidad;
 
         if (newQuantity > MAX_QUANTITY) {
             int overflow = newQuantity - MAX_QUANTITY;
             objetos.put(id, MAX_QUANTITY);
-            return overflow; // Devuelve la cantidad que no cabe
+            return overflow; // Devuelve la cantidad que no cabe, puede pasar que quiera añadir 3 objetos y 2
+                             // e desborden
         } else {
             objetos.put(id, newQuantity);
             return 0; // Se añadió todo sin desbordamiento
         }
     }
 
-    /**
-     * Elimina una cantidad de un objeto del inventario.
-     * 
-     * @param id       ID del objeto a eliminar.
-     * @param quantity Cantidad a eliminar.
-     * @return true si la eliminación fue exitosa (tenía suficiente cantidad), false
-     *         en caso contrario.
-     */
-    public boolean removeObjeto(int id, int quantity) {
+    // Método para eliminar una cantidad de un objeto del inventario
+    public boolean removeObjeto(int id, int cantidad) {
         int currentQuantity = objetos.getOrDefault(id, 0);
-        if (currentQuantity >= quantity) {
-            int newQuantity = currentQuantity - quantity;
+        if (currentQuantity >= cantidad) {
+            int newQuantity = currentQuantity - cantidad;
             if (newQuantity <= 0) {
                 objetos.remove(id);
             } else {
@@ -81,20 +68,7 @@ public class Inventario {
         return false;
     }
 
-    /**
-     * Intenta craftear un objeto usando una receta.
-     * 
-     * @param recipe La receta a seguir.
-     * @return true si el crafteo fue exitoso, false si no hay suficientes
-     *         ingredientes o si el resultado supera el límite.
-     */
     public boolean craftItem(Recipe recipe) {
-        // 1. Verificar si tiene todos los ingredientes
-        // UNIDAD 2: LEY DE DEMETER (Mínimo Conocimiento)
-        // En lugar de acceder a los datos internos de 'recipe' directamente,
-        // usamos sus métodos (getIngredients). Esto reduce el acoplamiento:
-        // 'Inventario' no necesita saber CÓMO se guardan los ingredientes dentro de
-        // 'recipe'.
         for (Map.Entry<Integer, Integer> entry : recipe.getIngredients().entrySet()) {
             int ingredientId = entry.getKey();
             int requiredQuantity = entry.getValue();
@@ -103,8 +77,6 @@ public class Inventario {
             }
         }
 
-        // 2. Verificar si el objeto resultante tiene espacio (si no supera el
-        // MAX_QUANTITY)
         int resultId = recipe.getItemId();
         int resultQuantity = recipe.getQuantity();
         int currentHeld = getQuantity(resultId);
@@ -113,15 +85,12 @@ public class Inventario {
             return false; // No hay espacio para el resultado (superaría el límite de 99)
         }
 
-        // 3. Ejecutar la transacción (eliminar ingredientes y añadir el resultado)
-
         // Eliminar ingredientes
         for (Map.Entry<Integer, Integer> entry : recipe.getIngredients().entrySet()) {
             removeObjeto(entry.getKey(), entry.getValue());
         }
 
         // Añadir el objeto crafteado
-        // Como ya verificamos que no supera el límite, simplemente lo añadimos.
         addObjeto(resultId, resultQuantity);
 
         return true;
@@ -135,6 +104,7 @@ public class Inventario {
         return Collections.unmodifiableMap(objetos);
     }
 
+    // Guarda el inventario en un archivo JSON
     public void save(String username) {
         if (username == null)
             return;
@@ -144,6 +114,7 @@ public class Inventario {
         file.writeString(json.toJson(objetos), false);
     }
 
+    // Carga el inventario desde un archivo JSON
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public void load(String username) {
         if (username == null)

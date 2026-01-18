@@ -15,18 +15,16 @@
 			"nombre": "Burbuja",
 			"tipo": "HADA",
 			"danoBase": 70,
-			"PP": 15,
-			"precision": 100
+			"PP": 15
 		},
 		"movimiento2": {
 			"nombre": "Bomba Seta",
 			"tipo": "PLANTA",
 			"danoBase": 55,
-			"PP": 25,
-			"precision": 100
+			"PP": 25
 		},
 		"nivel": 2,
-		"actualHP": 80,
+		"actualHP": 65,
 		"maxHp": 80,
 		"danoAtaque": 74,
 		"danoDefensa": 59,
@@ -39,7 +37,7 @@
 ],
 "researchLevels": {
 	"class": "java.util.HashMap",
-	"Rowlet": 3
+	"Rowlet": 2
 },
 "team": [
 	{
@@ -51,15 +49,13 @@
 			"nombre": "Burbuja",
 			"tipo": "HADA",
 			"danoBase": 70,
-			"PP": 15,
-			"precision": 100
+			"PP": 15
 		},
 		"movimiento2": {
 			"nombre": "Bomba Seta",
 			"tipo": "PLANTA",
 			"danoBase": 55,
-			"PP": 25,
-			"precision": 100
+			"PP": 25
 		},
 		"nivel": 2,
 		"actualHP": 65,

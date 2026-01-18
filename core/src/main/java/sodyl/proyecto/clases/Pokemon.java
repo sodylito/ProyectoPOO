@@ -1,18 +1,12 @@
 package sodyl.proyecto.clases;
 
-// UNIDAD 1 & 2: Definición de CLASE y ABSTRACCIÓN
-// Esta clase representa la abstracción de un Pokémon en el juego.
-// Aquí definimos los atributos (características) y métodos (comportamientos).
+//Clase para definir los atributos y comportamientos de cada pokemon de forma individual
 public class Pokemon {
 
-    // UNIDAD 2: ENCAPSULAMIENTO
-    // Usamos el modificador 'private' para proteger los datos de la clase.
-    // Esto asegura que el estado interno solo sea modificado a través de métodos
-    // controlados (Setters/Getters).
     private String especie;
     private TiposPokemon tipo;
-    private int baseHP; // Atributo: HP base al capturarlo
-    private int growthHP; // Atributo: Crecimiento por nivel
+    private int baseHP;
+    private int growthHP;
     private TiposAtaque movimiento1;
     private TiposAtaque movimiento2;
 
@@ -30,16 +24,9 @@ public class Pokemon {
     private String spriteFront;
     private String spriteBack;
 
-    // UNIDAD 1: CONSTRUCTOR POR DEFECTO
-    // Permite instanciar un objeto sin valores iniciales (útil para serialización).
     public Pokemon() {
     }
 
-    // UNIDAD 1: CONSTRUCTOR PARAMETRIZADO
-    // Permite inicializar el objeto con valores específicos al momento de su
-    // creación.
-    // Usamos 'this' para diferenciar los atributos de la clase de los parámetros
-    // del constructor.
     public Pokemon(String especie, TiposPokemon tipo, int baseHP, int growthHP, TiposAtaque movimiento1,
             TiposAtaque movimiento2) {
         this.especie = especie;
@@ -50,7 +37,7 @@ public class Pokemon {
         this.movimiento2 = movimiento2;
         this.nivel = 1;
 
-        // Lógica de inicialización: Cálculo de atributos basados en el nivel
+        // Este es el cálculo de los atributos que dependen del nivel del pokemón
         this.maxHp = baseHP + (nivel * growthHP);
         this.danoAtaque = movimiento1.danoBase + (nivel * 2);
         this.danoDefensa = movimiento2.danoBase + (nivel * 2);
@@ -70,8 +57,7 @@ public class Pokemon {
         this.velocidad = 10 + (effectiveLevel * 2);
     }
 
-    // UNIDAD 2: GETTERS Y SETTERS
-    // Métodos públicos para acceder y modificar atributos privados de forma segura.
+    // Getters y Setters
     public String getSpriteFront() {
         return spriteFront;
     }
@@ -116,7 +102,6 @@ public class Pokemon {
         return nivel;
     }
 
-    // Ejemplo de validación en un Setter (Encapsulamiento avanzado)
     public void setNivel(int nivel) {
         this.nivel = Math.max(0, Math.min(10, nivel));
     }
@@ -165,10 +150,7 @@ public class Pokemon {
         return ppM1;
     }
 
-    /**
-     * Decrementa en 1 los PP del movimiento 1 si hay >0. Devuelve true si pudo
-     * usarse.
-     */
+    // Función que evalúa si se puede usar el movimiento 1
     public boolean usarppM1() {
         if (this.ppM1 > 0) {
             this.ppM1--;
@@ -181,10 +163,6 @@ public class Pokemon {
         return ppM2;
     }
 
-    /**
-     * Decrementa en 1 los PP del movimiento 2 si hay >0. Devuelve true si pudo
-     * usarse.
-     */
     public boolean usatppM2() {
         if (this.ppM2 > 0) {
             this.ppM2--;
@@ -193,10 +171,6 @@ public class Pokemon {
         return false;
     }
 
-    /**
-     * UNIDAD 1: PASE DE MENSAJES
-     * Este método interactúa con otros métodos internos para realizar una acción.
-     */
     public boolean usarPPMovimiento(int movimientoNumero) {
         if (movimientoNumero == 1)
             return usarppM1();
@@ -205,7 +179,7 @@ public class Pokemon {
         return false;
     }
 
-    /** Restaura HP y PP al máximo */
+    // Restaura HP y PP al máximo, útil en el centro Pokémon
     public void restoreStatus() {
         this.actualHP = this.maxHp;
         if (this.movimiento1 != null) {

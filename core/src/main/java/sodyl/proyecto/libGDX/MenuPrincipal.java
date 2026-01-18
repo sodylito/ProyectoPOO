@@ -728,7 +728,7 @@ public class MenuPrincipal implements Screen, InputProcessor {
                         juego.clearProgress();
                         Gdx.app.log("MENU", "Iniciando Nuevo Juego.");
                         Gdx.input.setInputProcessor(null);
-                        juego.setScreen(new ScreenMapaTiled(juego, null));
+                        juego.setScreen(new ScreenMapaTiled(juego));
                         break;
                     case 1: // Continuar Juego
                         if (juego.hasSaveData(usuarioActual)) {
