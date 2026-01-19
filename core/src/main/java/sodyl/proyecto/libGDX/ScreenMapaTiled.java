@@ -2114,11 +2114,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return;
         }
 
-        // 2. Definir pesos de rareza para objetos
-        // Bonguri (comun), Hierba eter (comun) -> Peso 40
-        // Guijarro Rojo (poco comun), Baya aranja (poco comun) -> Peso 20
-        // Hierba regia (raro) -> Peso 5
-
+        // Aquí se definen los % de aparición de objetos
         Map<String, Integer> itemWeights = new HashMap<>();
         itemWeights.put("Bonguri", 40);
         itemWeights.put("Hierba éter", 40);
@@ -2129,11 +2125,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         int totalWeight = 0;
         for (int w : itemWeights.values())
             totalWeight += w;
-
-        // 3. Generar objetos
         float collectibleSize = 1f;
 
-        // 3. Garantizar mínimo 5 de cada material primario (25 objetos garantizados)
         String[] primaryMaterials = { "Bonguri", "Hierba éter", "Guijarro Rojo", "Baya Aranja", "Hierba Regia" };
         int guaranteedPerMaterial = 5;
         int guaranteedTotal = primaryMaterials.length * guaranteedPerMaterial; // 25
@@ -2141,7 +2134,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Gdx.app.log("COLECTABLES",
                 "Generando " + guaranteedTotal + " objetos garantizados (5 de cada tipo)...");
 
-        // Fase 1: Generar objetos garantizados
         for (String materialName : primaryMaterials) {
             for (int j = 0; j < guaranteedPerMaterial; j++) {
                 if (validSpawnPositions.isEmpty())
@@ -2161,8 +2153,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 float adjustedY = worldY + (TILE_HEIGHT * UNIT_SCALE - collectibleSize) / 2f;
 
                 int quantity = random.nextInt(3) + 1;
-
-                // Convert world position back to tile coordinates for logging
                 int tileX = (int) (worldX / (TILE_WIDTH * UNIT_SCALE));
                 int tileY = (int) (worldY / (TILE_HEIGHT * UNIT_SCALE));
 
@@ -2177,7 +2167,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
         }
 
-        // Fase 2: Generar objetos restantes con probabilidades (35 objetos)
         int remainingToSpawn = totalItemsToSpawn - guaranteedTotal;
         Gdx.app.log("COLECTABLES",
                 "Generando " + remainingToSpawn + " objetos adicionales con probabilidades...");
@@ -2186,9 +2175,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             if (validSpawnPositions.isEmpty())
                 break;
 
-            // Seleccionar objeto basado en peso
             int roll = random.nextInt(totalWeight);
-            String selectedItemName = "Bonguri"; // Default
+            String selectedItemName = "Bonguri";
             int currentWeight = 0;
 
             for (Map.Entry<String, Integer> entry : itemWeights.entrySet()) {
@@ -2214,7 +2202,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
             int quantity = random.nextInt(3) + 1;
 
-            // Convert world position back to tile coordinates for logging
             int tileX = (int) (worldX / (TILE_WIDTH * UNIT_SCALE));
             int tileY = (int) (worldY / (TILE_HEIGHT * UNIT_SCALE));
 
@@ -2278,47 +2265,31 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     private void startProfessorYoelAnimation() {
-        // Initialize dialogBox here to prevent NPE in render/input methods
         if (dialogBox == null) {
             dialogBox = new DialogBox(uiStage, font);
-            dialogBox.hide(); // Hide it initially
+            dialogBox.hide();
         }
 
         if (yoelImage == null) {
             initializeDialogueSequence();
             return;
         }
-
-        // 1. Setup Yoel Image
-        // Scale it reasonably (e.g., height of 300px?)
         float yoelHeight = 400f;
         float scale = yoelHeight / yoelImage.getHeight();
         float yoelWidth = yoelImage.getWidth() * scale;
 
         yoelImage.setSize(yoelWidth, yoelHeight);
 
-        // Start Position: Off-screen Right
         float startX = uiStage.getWidth() + 50;
-        float targetX = uiStage.getWidth() - yoelWidth - 50; // Position on Right side of screen
-        // Wait, user said: "generarse en la derecha ... y moverse rapidamente a la
-        // izquierda ... cuando esté en la izquierda, se colocan los dialogos"
-        // "moverse a la izquierda" implies moving TOWARDS the left, or ending up ON the
-        // left?
-        // "cuando esté en la izquierda" -> Ends up on the left side.
+        float targetX = uiStage.getWidth() - yoelWidth - 50;
+        targetX = 50;
 
-        // Let's interpret: Starts Right (offscreen) -> Moves to Left side of screen.
-        targetX = 50; // 50px from left edge
-
-        float yPos = 0; // Bottom of screen (behind dialogue box potentially)
-
+        float yPos = 0;
         yoelImage.setPosition(startX, yPos);
 
-        // Ensure it's on stage
         uiStage.addActor(yoelImage);
 
-        // 2. Animate
-        // Move fast (rapidamenet)
-        float duration = 1.0f; // 1 second
+        float duration = 1.0f;
 
         yoelImage.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
                 com.badlogic.gdx.scenes.scene2d.actions.Actions.moveTo(targetX, yPos, duration,
@@ -2332,7 +2303,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         if (dialogBox == null) {
             dialogBox = new DialogBox(uiStage, font);
         }
-        // Ensure dialog box is on top of Yoel
         dialogBox.toFront();
 
         dialogueQueue = new LinkedList<>();
@@ -2340,7 +2310,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             dialogueQueue.add(line);
         }
         currentState = GameState.DIALOGUE;
-        isSpecialEventDialogue = true; // Flag to trigger transition after dialogue
+        isSpecialEventDialogue = true;
         processNextDialogueLine();
     }
 
@@ -2352,7 +2322,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
     }
 
-    // **FUNCIÓN CORREGIDA: Pasa a FREE_ROAMING directamente**
     private void startArceusBattleDialogue() {
         dialogueQueue.clear();
         dialogueQueue.add("Una luz cegadora emana del centro del santuario...");
@@ -2360,7 +2329,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         dialogueQueue.add("Su poder es abrumador. Esta será tu prueba final.");
         dialogueQueue.add("¿Estás listo para desafiar a la leyenda? No podrás huir de la batalla.");
 
-        isArceusDialogue = true; // Flag para manejar la respuesta
+        isArceusDialogue = true;
         currentState = GameState.DIALOGUE;
         processNextDialogueLine();
     }
@@ -2382,26 +2351,20 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return;
         }
 
-        // Always remove Yoel's image when dialogue ends
         if (yoelImage != null) {
             yoelImage.remove();
         }
 
         if (isSpecialEventDialogue) {
             isSpecialEventDialogue = false;
-            // Go to Selection Screen
             game.setScreen(new SeleccionPokemon(game, this));
             return;
         }
 
-        // Si hay una batalla pendiente, proceder a iniciarla en lugar de volver al modo
-        // libre
         if (this.pendingEnemyForBattle != null) {
             proceedWithPendingBattle();
             return;
         }
-
-        // Si hay acción pendiente post-diálogo (ej. opciones Si/No)
         if (onDialogCompleteAction != null) {
             Runnable action = onDialogCompleteAction;
             onDialogCompleteAction = null;
@@ -2411,9 +2374,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         currentState = GameState.FREE_ROAMING;
     }
-
-    // **FUNCIÓN ELIMINADA: private void startTransitionToPokemonSelection()**
-    // **FUNCIÓN ELIMINADA: private void startTransitionToMainMenu()**
 
     private void initializePauseMenu() {
         TextButtonStyle buttonStyle = new TextButtonStyle();
@@ -2441,8 +2401,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         pauseMenuTable.add(new TextButton("JUEGO PAUSADO", buttonStyle)).width(300).height(80).pad(20).row();
         pauseMenuTable.add(inventoryButton).width(250).height(60).pad(10).row();
-        // pauseMenuTable.add(craftingButton).width(250).height(60).pad(10).row(); //
-        // REMOVIDO
         pauseMenuTable.add(pokedexButton).width(250).height(60).pad(10).row();
         pauseMenuTable.add(pokemonesDataButton).width(250).height(60).pad(10).row();
         pauseMenuTable.add(saveButton).width(250).height(60).pad(10).row();
@@ -2478,9 +2436,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 }
             }
         });
-
-
-
         pokemonesDataButton.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -2495,8 +2450,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         updatePauseMenuSelection(0);
     }
-
-
 
     private void initializeInventoryMenu() {
         Label.LabelStyle titleStyle = new Label.LabelStyle(font, Color.YELLOW);
@@ -2576,7 +2529,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             Texture itemTexture = itemTextures.get(itemId);
             if (itemTexture != null) {
                 Image icon = new Image(itemTexture);
-
                 itemContainer.add(icon).width(60).height(60).padRight(10).center();
             } else {
                 itemContainer.add(new Label("?", nameStyle)).width(60).height(60).padRight(10).center();
@@ -2610,9 +2562,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     .colspan(3).padTop(50);
         }
     }
-
-
-
 
     private void initializeCraftingMenu() {
         Label.LabelStyle labelStyle = new Label.LabelStyle(font, Color.WHITE);
@@ -2792,8 +2741,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private void updatePauseMenuSelection(int newIndex) {
         if (pauseMenuButtons == null || pauseMenuButtons.length == 0)
             return;
-
-
         for (TextButton btn : pauseMenuButtons) {
             if (btn != null && btn.getLabel() != null) {
                 btn.getLabel().setColor(Color.WHITE);
@@ -2801,8 +2748,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
 
         selectedIndex = (newIndex + pauseMenuButtons.length) % pauseMenuButtons.length;
-
-
         if (pauseMenuButtons[selectedIndex] != null && pauseMenuButtons[selectedIndex].getLabel() != null) {
             pauseMenuButtons[selectedIndex].getLabel().setColor(Color.YELLOW);
         }
@@ -2812,13 +2757,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         if (currentState != GameState.PAUSED)
             return;
 
-
-
-
-
-
-
-
         if (index == 0)
             showInventorySubmenu();
         else if (index == 1)
@@ -2826,10 +2764,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         else if (index == 2)
             showPokemonesMenu();
         else if (index == 3) {
-
             game.saveProgress(playerInventory);
             togglePauseMenu();
-
 
             if (dialogueQueue == null)
                 dialogueQueue = new LinkedList<>();
@@ -2842,8 +2778,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         else if (index == 5)
             togglePauseMenu();
     }
-
-
 
     private void initializeInventorySubmenu() {
         Texture darkBackground = createColoredTexture(new Color(0.1f, 0.1f, 0.1f, 0.9f));
@@ -2860,8 +2794,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         TextButton viewItemsBtn = new TextButton("Ver Objetos", style);
         TextButton craftItemsBtn = new TextButton("Craftear", style);
         TextButton backBtn = new TextButton("Volver", style);
-
-
 
         inventorySubmenuTable.add(new Label("--- OPCIONES DE INVENTARIO ---", new Label.LabelStyle(font, Color.CYAN)))
                 .padBottom(30).row();
@@ -2882,18 +2814,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     }
 
     private void updateInventorySubmenuUI() {
-
-
-
         Table table = inventorySubmenuTable;
-
-
-
         ((TextButton) table.getChildren().get(1)).getLabel().setColor(Color.WHITE);
         ((TextButton) table.getChildren().get(2)).getLabel().setColor(Color.WHITE);
         ((TextButton) table.getChildren().get(3)).getLabel().setColor(Color.WHITE);
-
-
         ((TextButton) table.getChildren().get(selectedInventorySubmenuIndex + 1)).getLabel().setColor(Color.YELLOW);
     }
 
@@ -2905,7 +2829,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             inventorySubmenuTable.setVisible(false);
             showCraftingMenu();
         } else if (index == 2) {
-
             currentState = GameState.PAUSED;
             inventorySubmenuTable.setVisible(false);
             pauseMenuTable.setVisible(true);
@@ -2913,14 +2836,11 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
     }
 
-
-
     private void initializePokedexActionMenu() {
         Texture darkBackground = createColoredTexture(new Color(0.1f, 0.1f, 0.1f, 0.95f));
         TextureRegionDrawable backgroundDrawable = new TextureRegionDrawable(darkBackground);
 
         pokedexActionMenuTable = new Table();
-
         pokedexActionMenuTable.setSize(300, 200);
         pokedexActionMenuTable.setPosition((uiStage.getWidth() - 300) / 2, (uiStage.getHeight() - 200) / 2);
         pokedexActionMenuTable.setBackground(backgroundDrawable);
@@ -2957,21 +2877,16 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Label.LabelStyle labelStyle = new Label.LabelStyle(font, Color.WHITE);
         Label.LabelStyle valueStyle = new Label.LabelStyle(font, new Color(0.7f, 1f, 0.7f, 1f));
         Label.LabelStyle infoStyle = new Label.LabelStyle(font, new Color(0.9f, 0.9f, 0.6f, 1f));
-
-
         pokemonInfoTable.add(new Label("--- INFORMACIÓN DE " + pokemon.getEspecie().toUpperCase() + " ---", titleStyle))
                 .colspan(2).padBottom(30).row();
-
 
         pokemonInfoTable.add(new Label("Tipo:", labelStyle)).left().padRight(20);
         pokemonInfoTable.add(new Label(pokemon.getTipo().toString(), valueStyle)).left().row();
         pokemonInfoTable.add().height(10).row();
 
-
         pokemonInfoTable.add(new Label("Nivel de Investigación:", labelStyle)).left().padRight(20);
         pokemonInfoTable.add(new Label(pokemon.getNivel() + "/10", valueStyle)).left().row();
         pokemonInfoTable.add().height(10).row();
-
 
         pokemonInfoTable.add(new Label("HP:", labelStyle)).left().padRight(20);
         String hpText = pokemon.getActualHP() + "/" + pokemon.getMaxHp();
@@ -2980,9 +2895,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         pokemonInfoTable.add(new Label(hpText, new Label.LabelStyle(font, hpColor))).left().row();
         pokemonInfoTable.add().height(20).row();
 
-
         pokemonInfoTable.add(new Label("=== ATAQUES ===", titleStyle)).colspan(2).padBottom(15).row();
-
 
         if (pokemon.getMovimiento1() != null) {
             int attack1Damage = pokemon.getMovimiento1().danoBase + (pokemon.getNivel() * 2);
@@ -3001,7 +2914,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             pokemonInfoTable.add().height(15).row();
         }
 
-
         if (pokemon.getMovimiento2() != null) {
             int attack2Damage = pokemon.getMovimiento2().danoBase + (pokemon.getNivel() * 2);
             pokemonInfoTable.add(new Label("Ataque 2:", labelStyle)).left().padRight(20);
@@ -3018,7 +2930,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     .row();
         }
 
-
         pokemonInfoTable.add().height(30).row();
         pokemonInfoTable.add(new Label("Presiona ESC para volver", new Label.LabelStyle(font, Color.GRAY)))
                 .colspan(2).row();
@@ -3029,7 +2940,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         currentState = GameState.POKEDEX_ACTION_MENU;
         selectedPokedexActionIndex = 0;
         pokedexActionMenuTable.setVisible(true);
-
         pokedexActionMenuTable.toFront();
         updatePokedexActionMenuUI();
     }
@@ -3053,35 +2963,23 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     private void executePokedexAction(int index) {
         if (index == 2) {
-
             currentState = GameState.POKEDEX;
             pokedexActionMenuTable.setVisible(false);
             return;
         }
 
         if (index == 1) {
-
             showPokemonInfo(selectedPokemonForHealing);
             return;
         }
-
-
-
-
-
-
         int potionId = -1;
-
         Objeto potionObj = Objeto.getObjetoByName("Pocion");
         if (potionObj == null)
             potionObj = Objeto.getObjetoByName("Poción");
 
-
         if (potionObj != null) {
             potionId = potionObj.getId();
         } else {
-
-
             for (Integer id : playerInventory.getAllObjetos().keySet()) {
                 Objeto o = Objeto.getObjeto(id);
                 if (o != null && o.getTipo() == Objeto.Type.MEDICINA) {
@@ -3092,24 +2990,13 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         }
 
         if (potionId != -1 && playerInventory.getQuantity(potionId) > 0) {
-
             selectedPokemonForHealing.setActualHP(selectedPokemonForHealing.getMaxHp());
             playerInventory.removeObjeto(potionId, 1);
-
-
             dialogueQueue.add("¡" + selectedPokemonForHealing.getEspecie() + " ha sido curado!");
             dialogueQueue.add("Usaste 1 " + Objeto.getObjeto(potionId).getNombre() + ".");
-
-
-
-
-
             currentState = GameState.DIALOGUE;
             pokedexActionMenuTable.setVisible(false);
             pokedexMenuTable.setVisible(false);
-
-
-
             final GameState returnState = GameState.POKEDEX;
             onDialogCompleteAction = () -> {
                 currentState = returnState;
@@ -3119,7 +3006,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             processNextDialogueLine();
 
         } else {
-
             currentState = GameState.DIALOGUE;
             pokedexActionMenuTable.setVisible(false);
             pokedexMenuTable.setVisible(false);
@@ -3129,7 +3015,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             onDialogCompleteAction = () -> {
                 currentState = GameState.POKEDEX;
                 pokedexMenuTable.setVisible(true);
-
             };
             processNextDialogueLine();
         }
@@ -3153,13 +3038,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     private void startTransitionBackToMap1() {
         currentState = GameState.TRANSITIONING;
         transitionTimer = 0f;
-
-
         {
-
             float tileX = 38f;
             float tileY = 36f;
-
 
             if (returnTileXBeforePokemonCenter != null && returnTileYBeforePokemonCenter != null) {
                 tileX = returnTileXBeforePokemonCenter;
@@ -3177,8 +3058,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     @Override
     public void render(float delta) {
-
-
         if (currentState == GameState.BATTLE) {
             currentState = GameState.FREE_ROAMING;
         }
@@ -3187,9 +3066,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         if (currentState == GameState.FREE_ROAMING) {
             handleMovement(delta);
-
-
-
             if (isMultiplayer && conexion != null) {
                 syncTimer += delta;
                 if (syncTimer >= SYNC_INTERVAL) {
@@ -3198,8 +3074,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     sendMovementUpdate(characterActor.getX(), characterActor.getY(), lastDirection.name(), isMoving);
                 }
             }
-
-
             if (collectibles != null) {
                 for (Collectible c : collectibles) {
                     if (c.isCollected()) {
@@ -3215,7 +3089,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 }
             }
 
-
             if (!canTriggerEncounter) {
                 encounterCooldown += delta;
                 if (encounterCooldown >= ENCOUNTER_COOLDOWN_TIME) {
@@ -3225,8 +3098,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                             "Cooldown de encuentros completado. Los encuentros están activos nuevamente.");
                 }
             } else {
-
-
                 if (currentState != GameState.BATTLE) {
                     checkEncounterZones();
                 }
@@ -3239,11 +3110,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         stateTime += delta;
         updateCharacterAnimation();
-
-
         clampCamera();
         camera.update();
-
 
         if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
             npcAnimationTimer += delta;
@@ -3268,7 +3136,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                             useFrame2 ? donValerio2Texture : donValerio1Texture));
             com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d7 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
                     new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? giorno2Texture : giorno1Texture));
-
 
             com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable d8 = new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
                     new com.badlogic.gdx.graphics.g2d.TextureRegion(useFrame2 ? bonnie2Texture : bonnie1Texture));
@@ -3311,13 +3178,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         if (renderer != null && map != null) {
             try {
-
-
                 com.badlogic.gdx.utils.IntArray layersToRender = new com.badlogic.gdx.utils.IntArray();
                 for (int i = 0; i < map.getLayers().getCount(); i++) {
                     MapLayer layer = map.getLayers().get(i);
-
-
                     if (layer instanceof com.badlogic.gdx.maps.tiled.TiledMapTileLayer) {
                         String layerName = layer.getName();
                         if (layerName != null && (layerName.equals("Colisiones") || layerName.equals("BASE"))) {
@@ -3328,12 +3191,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 }
                 renderer.setView(camera);
                 renderer.render(layersToRender.toArray());
-
-
                 renderArceusMarker(delta);
             } catch (Exception e) {
                 Gdx.app.error("RENDER", "Error al renderizar el mapa: " + e.getMessage(), e);
-
                 try {
                     if (map != null) {
                         renderer = new OrthogonalTiledMapRenderer(map, UNIT_SCALE);
@@ -3360,8 +3220,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         uiStage.act(delta);
         uiStage.draw();
-
-
         if (isFadingIn) {
             transitionTimer += delta;
             float alpha = 1.0f - Math.min(1f, transitionTimer / transitionDuration);
@@ -3441,17 +3299,14 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         } else if (keycode == Keys.ENTER || keycode == Keys.Z) {
             choiceBoxTable.setVisible(false);
             if (selectedChoiceIndex == 0) {
-
                 if (onYesAction != null) {
                     onYesAction.run();
                 }
             } else {
-
                 if (onNoAction != null) {
                     onNoAction.run();
                 }
             }
-
             onYesAction = null;
             onNoAction = null;
         }
@@ -3502,11 +3357,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         ((Image) characterActor).setDrawable(new TextureRegionDrawable(currentFrame));
     }
 
-
-
-
-
-
     private void handleMovement(float delta) {
         if (currentState != GameState.FREE_ROAMING)
             return;
@@ -3550,9 +3400,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     break;
                 }
             }
-
-
-
             if (!collidedX) {
                 nextX += dx;
             }
@@ -3568,9 +3415,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     break;
                 }
             }
-
-
-
             if (!collidedY) {
                 nextY += dy;
             }
@@ -3588,8 +3432,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         int tileX = (int) ((nextX + playerWidth / 2) / (tileWidth * UNIT_SCALE));
         int tileY = (int) ((nextY + playerHeight / 2) / (tileHeight * UNIT_SCALE));
-
-
         if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
             if (tileX == 38 && tileY == 37) {
                 startTransitionToPokemonCenter(38, 36);
@@ -3602,40 +3444,23 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
         }
 
-
-
         if (mapPath.contains("Centro Pokemon interior") && tileX == 6 && tileY == 1) {
             startTransitionBackToMap1();
         }
-
-
-
-
-
-
-
         if (stateTime > 2.0f) {
 
         }
     }
 
-
     private void clampCamera() {
-
         float desiredCameraX = characterActor.getX() + characterActor.getWidth() / 2;
         float desiredCameraY = characterActor.getY() + characterActor.getHeight() / 2;
-
-
         float tileWidth = map.getProperties().get("tilewidth", Integer.class);
         float tileHeight = map.getProperties().get("tileheight", Integer.class);
         float mapWidth = mapWidthTiles * tileWidth * UNIT_SCALE;
         float mapHeight = mapHeightTiles * tileHeight * UNIT_SCALE;
-
-
         float cameraHalfWidth = camera.viewportWidth / 2;
         float cameraHalfHeight = camera.viewportHeight / 2;
-
-
         float minCameraX = cameraHalfWidth;
         float maxCameraX = mapWidth - cameraHalfWidth;
         float minCameraY = cameraHalfHeight;
@@ -3650,15 +3475,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return;
 
         arceusMarkerTimer += delta;
-
-
         float pulse = 0.5f + 0.5f * com.badlogic.gdx.math.MathUtils.sin(arceusMarkerTimer * 3f);
         float scale = 1.0f + 0.3f * pulse;
-
-
-
-
-
         float tileWidth = map.getProperties().get("tilewidth", Integer.class);
         float tileHeight = map.getProperties().get("tileheight", Integer.class);
 
@@ -3686,8 +3504,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             handleChoiceInput(keycode);
             return true;
         }
-
-
         if (currentState == GameState.DIALOGUE) {
             if (keycode == Keys.ENTER || keycode == Keys.Z) {
                 if (dialogBox.isTyping()) {
@@ -3703,8 +3519,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
             return true;
         }
-
-
         if (keycode == Keys.ESCAPE) {
             if (currentState == GameState.FREE_ROAMING || currentState == GameState.PAUSED) {
                 togglePauseMenu();
@@ -3731,13 +3545,13 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 pokemonesMenuTable.setVisible(true);
                 return true;
             } else if (currentState == GameState.CRAFTING) {
-
+                // Back to Submenu
                 currentState = GameState.INVENTORY_SUBMENU;
                 craftingMenuTable.setVisible(false);
                 inventorySubmenuTable.setVisible(true);
                 return true;
             } else if (currentState == GameState.INVENTORY) {
-
+                // Back to Submenu
                 currentState = GameState.INVENTORY_SUBMENU;
                 inventoryMenuTable.setVisible(false);
                 inventorySubmenuTable.setVisible(true);
@@ -3758,7 +3572,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
         }
 
-
         if (currentState == GameState.PAUSED) {
             if (keycode == Keys.DOWN) {
                 updatePauseMenuSelection(selectedIndex + 1);
@@ -3774,7 +3587,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
             return true;
         }
-
 
         if (currentState == GameState.CRAFTING) {
             if (availableRecipes.isEmpty())
@@ -3796,7 +3608,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
             return true;
         }
-
 
         if (currentState == GameState.INVENTORY) {
             if (keycode == Keys.UP || keycode == Keys.DOWN) {
@@ -3821,7 +3632,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
             return false;
         }
-
 
         if (currentState == GameState.POKEDEX_SUBMENU) {
             if (keycode == Keys.UP) {
@@ -3852,7 +3662,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return false;
         }
 
-
         if (currentState == GameState.POKEMONES_MENU) {
             if (keycode == Keys.UP) {
                 selectedPokemonesMenuIndex = (selectedPokemonesMenuIndex - 1 + 3) % 3;
@@ -3880,7 +3689,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return false;
         }
 
-
         if (currentState == GameState.TYPES_MENU) {
             if (keycode == Keys.UP || keycode == Keys.DOWN) {
                 ScrollPane scrollPane = (ScrollPane) typesMenuTable.findActor("typesScrollPane");
@@ -3902,7 +3710,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
             return false;
         }
-
 
         if (currentState == GameState.ATTACKS_MENU) {
             if (keycode == Keys.UP || keycode == Keys.DOWN) {
@@ -3926,7 +3733,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return false;
         }
 
-
         if (currentState == GameState.POKEDEX) {
             if (keycode == Keys.UP) {
                 if (!currentPokedexList.isEmpty()) {
@@ -3946,7 +3752,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             if (keycode == Keys.ENTER || keycode == Keys.Z) {
                 if (!currentPokedexList.isEmpty()) {
                     String species = currentPokedexList.get(selectedPokedexIndex);
-
                     List<Pokemon> caught = sodyl.proyecto.clases.Pokedex.getCollected();
                     Pokemon target = null;
                     for (Pokemon p : caught) {
@@ -3958,16 +3763,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
                     if (target != null) {
                         showPokedexActionMenu(target);
-                    } else {
-
-
                     }
                 }
                 return true;
             }
             return false;
         }
-
 
         if (currentState == GameState.POKEDEX_ACTION_MENU) {
             if (keycode == Keys.UP || keycode == Keys.DOWN) {
@@ -3991,7 +3792,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return true;
         }
 
-
         if (currentState == GameState.POKEMON_INFO) {
             if (keycode == Keys.ESCAPE || keycode == Keys.X) {
                 currentState = GameState.POKEDEX;
@@ -4001,7 +3801,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
             return true;
         }
-
 
         if (currentState == GameState.INVENTORY_SUBMENU) {
             if (keycode == Keys.UP) {
@@ -4020,7 +3819,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
             return true;
         }
-
 
         if (currentState == GameState.TEAM_SELECTION) {
             List<Pokemon> all = sodyl.proyecto.clases.Pokedex.getCollected();
@@ -4044,17 +3842,14 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             return false;
         }
 
-
         if ((keycode == Keys.ENTER || keycode == Keys.Z) && currentState == GameState.FREE_ROAMING) {
             float tileWidth = map.getProperties().get("tilewidth", Integer.class);
             float tileHeight = map.getProperties().get("tileheight", Integer.class);
-
 
             int centerX = (int) ((characterActor.getX() + characterActor.getWidth() / 2) / (tileWidth * UNIT_SCALE));
             int centerY = (int) ((characterActor.getY() + characterActor.getHeight() / 2) / (tileHeight * UNIT_SCALE));
 
             if (centerX == 47 && centerY == 12 && mapPath.contains("MAPACOMPLETO.tmx")) {
-
                 int level10Count = 0;
                 for (Pokemon p : sodyl.proyecto.clases.Pokedex.getCollected()) {
                     if (p.getNivel() >= 10) {
@@ -4077,21 +3872,14 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
         }
 
-
         if (currentState == GameState.FREE_ROAMING && (keycode == Keys.ENTER || keycode == Keys.Z))
 
         {
 
-
-
             float playerCenterX = characterActor.getX() + characterActor.getWidth() / 2;
             float playerCenterY = characterActor.getY() + characterActor.getHeight() / 2;
-
-
-
             int tileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
             int tileY = (int) (playerCenterY / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
-
 
             if (mapPath != null && mapPath.contains("MAPACOMPLETO.tmx")) {
                 if (tileX >= 40 && tileX <= 42 && tileY >= 37 && tileY <= 39) {
@@ -4152,7 +3940,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                     return true;
                 }
 
-
                 if (tileX >= 29 && tileX <= 31 && tileY >= 25 && tileY <= 27) {
                     startDialogueNPCInteraction("Bonnie");
                     return true;
@@ -4171,13 +3958,11 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 }
             }
 
-
             if (tileX == 21 && tileY == 48) {
                 TiledMapTileLayer layer = (TiledMapTileLayer) map.getLayers().get("NIvel 1");
                 if (layer != null) {
                     Cell cell = layer.getCell(tileX, tileY);
                     if (cell != null && cell.getTile() != null && cell.getTile().getId() == 5106) {
-
                         triggerSpecialEvent();
                         return true;
                     }
@@ -4188,8 +3973,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
             for (int i = collectibles.size - 1; i >= 0; i--) {
                 Collectible collectible = collectibles.get(i);
-
-
                 boolean isAvailable = true;
                 if (isMultiplayer && sharedResourceManager != null) {
                     String cId = mapPath + "_" + (int) collectible.getActor().getX() + "_"
@@ -4221,10 +4004,7 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                         }
 
                         collectible.setCollected(true);
-
-
                         if (isMultiplayer && conexion != null) {
-
                             String colId = mapPath + "_" + (int) collectible.getActor().getX() + "_"
                                     + (int) collectible.getActor().getY();
 
@@ -4261,13 +4041,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
             Gdx.app.log("INTERACCION", "Intento de interacción en Free Roaming (sin objeto cerca)");
 
-
             if (mapPath.contains("Centro Pokemon interior")) {
                 int pTileX = (int) (playerCenterX / (map.getProperties().get("tilewidth", Integer.class) * UNIT_SCALE));
                 int pTileY = (int) (playerCenterY
                         / (map.getProperties().get("tileheight", Integer.class) * UNIT_SCALE));
-
-
 
                 if (Math.abs(pTileX - 3) <= 1 && Math.abs(pTileY - 4) <= 1) {
                     dialogueQueue = new LinkedList<>();
@@ -4278,8 +4055,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
                     currentState = GameState.DIALOGUE;
                     dialogBox.setText(dialogueQueue.poll());
-
-
                     onDialogCompleteAction = new Runnable() {
                         @Override
                         public void run() {
@@ -4291,7 +4066,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             }
 
         }
-
 
         if (currentState == GameState.FREE_ROAMING) {
             if (keycode == Keys.W || keycode == Keys.UP) {
@@ -4311,8 +4085,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 return true;
             }
 
-
-
             if (keycode == Keys.L) {
 
                 float tileWidth = map.getProperties().get("tilewidth", Integer.class);
@@ -4326,7 +4098,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
                 Gdx.app.log("DEBUG_TOOL", "Tile Recorded: " + record);
                 return true;
             }
-
 
             if (keycode == Keys.P) {
                 StringBuilder sb = new StringBuilder();
@@ -4343,10 +4114,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         }
 
-
         if (currentState == GameState.FREE_ROAMING && (keycode == Keys.F)) {
             if (isMultiplayer && duelManager != null) {
-
 
                 float closestDist = 3.0f * 16 * UNIT_SCALE;
                 String targetId = null;
@@ -4379,7 +4148,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         return false;
     }
 
-
     @Override
     public boolean keyUp(int keycode) {
         if (currentState != GameState.FREE_ROAMING)
@@ -4407,14 +4175,9 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, false);
 
-
         uiStage.getViewport().update(width, height, true);
 
         if (dialogBox != null) {
-
-
-
-
             dialogBox.resize(uiStage.getWidth(), uiStage.getHeight());
         }
     }
@@ -4423,7 +4186,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Label.LabelStyle titleStyle = new Label.LabelStyle(font, Color.YELLOW);
         Texture darkBackground = createColoredTexture(new Color(0.1f, 0.1f, 0.1f, 0.9f));
         TextureRegionDrawable backgroundDrawable = new TextureRegionDrawable(darkBackground);
-
 
         pokedexMenuTable = new Table();
         pokedexMenuTable.setFillParent(true);
@@ -4437,15 +4199,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         pokedexMenuTable.setVisible(false);
         uiStage.addActor(pokedexMenuTable);
 
-
         pokedexSubmenuTable = new Table();
         pokedexSubmenuTable.setFillParent(true);
         pokedexSubmenuTable.setBackground(backgroundDrawable);
         pokedexSubmenuTable.pad(50);
         pokedexSubmenuTable.setVisible(false);
         uiStage.addActor(pokedexSubmenuTable);
-
-
         teamSelectionTable = new Table();
         teamSelectionTable.setFillParent(true);
         teamSelectionTable.setBackground(backgroundDrawable);
@@ -4608,7 +4367,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Texture darkBackground = createColoredTexture(new Color(0.1f, 0.1f, 0.1f, 0.9f));
         TextureRegionDrawable backgroundDrawable = new TextureRegionDrawable(darkBackground);
 
-
         pokemonesMenuTable = new Table();
         pokemonesMenuTable.setFillParent(true);
         pokemonesMenuTable.setBackground(backgroundDrawable);
@@ -4616,14 +4374,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         pokemonesMenuTable.setVisible(false);
         uiStage.addActor(pokemonesMenuTable);
 
-
         typesMenuTable = new Table();
         typesMenuTable.setFillParent(true);
         typesMenuTable.setBackground(backgroundDrawable);
         typesMenuTable.pad(50);
         typesMenuTable.setVisible(false);
         uiStage.addActor(typesMenuTable);
-
 
         attacksMenuTable = new Table();
         attacksMenuTable.setFillParent(true);
@@ -4635,7 +4391,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     private void showYesNoChoice() {
         showYesNoChoice("Sí", "No", () -> {
-
             if (playerPokemon != null) {
                 playerPokemon.restoreStatus();
                 for (Pokemon p : sodyl.proyecto.clases.Pokedex.getTeam()) {
@@ -4676,7 +4431,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         Label yesLabel = new Label(yesText, (selectedChoiceIndex == 0) ? selectedStyle : normalStyle);
         Label noLabel = new Label(noText, (selectedChoiceIndex == 1) ? selectedStyle : normalStyle);
-
 
         yesLabel.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
             @Override
@@ -4753,10 +4507,8 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         for (sodyl.proyecto.clases.TiposPokemon type : sodyl.proyecto.clases.TiposPokemon.values()) {
             content.add(new Label("[" + type.name() + "]", typeStyle)).left().padTop(15).row();
 
-
             StringBuilder strongBuilder = new StringBuilder("Fuerte contra: ");
             boolean firstStrong = true;
-
             StringBuilder weakBuilder = new StringBuilder("Débil contra: ");
             boolean firstWeak = true;
 
@@ -4811,14 +4563,12 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         Table content = new Table();
         content.top().left();
 
-
         content.add(new Label("NOMBRE", headerStyle)).width(250).left();
         content.add(new Label("TIPO", headerStyle)).width(150).left();
         content.add(new Label("DAÑO", headerStyle)).width(100).right().row();
         content.add().colspan(3).height(10).row();
 
         java.util.List<sodyl.proyecto.clases.TiposAtaque> attacks = sodyl.proyecto.clases.Pokemones.getAllAttacks();
-
         for (sodyl.proyecto.clases.TiposAtaque atk : attacks) {
             content.add(new Label(atk.nombre, contentStyle)).left();
             content.add(new Label(atk.tipo.name(), contentStyle)).left();
@@ -4874,7 +4624,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     private void triggerSpecialEvent() {
         if (playerPokemon != null) {
-
             if (dialogBox == null) {
                 dialogBox = new DialogBox(uiStage, font);
             }
@@ -4888,7 +4637,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             processNextDialogueLine();
             return;
         }
-
 
         if (dialogBox == null) {
             dialogBox = new DialogBox(uiStage, font);
@@ -4904,10 +4652,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         currentState = GameState.DIALOGUE;
         processNextDialogueLine();
-
-
-
-
         isSpecialEventDialogue = true;
     }
 
@@ -4981,8 +4725,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
     @Override
     public void hide() {
         saveGame();
-
-
         if (currentState != GameState.BATTLE) {
             dispose();
         }
@@ -4994,8 +4736,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
     @Override
     public void dispose() {
-
-
         if (yoelTexture != null)
             yoelTexture.dispose();
         if (recepcionistaTexture != null)
@@ -5023,8 +4763,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
 
         if (blackPixelTexture != null)
             blackPixelTexture.dispose();
-
-
         if (kaneki1Texture != null)
             kaneki1Texture.dispose();
         if (kaneki2Texture != null)
@@ -5053,8 +4791,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             giorno1Texture.dispose();
         if (giorno2Texture != null)
             giorno2Texture.dispose();
-
-
         if (stage != null)
             stage.dispose();
         if (uiStage != null)
@@ -5074,12 +4810,10 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
         if (dialogBox != null)
             dialogBox.dispose();
 
-
         for (Texture texture : itemTextures.values()) {
             texture.dispose();
         }
         itemTextures.clear();
-
 
         if (isMultiplayer && conexion != null) {
             Map<String, Object> data = new HashMap<>();
@@ -5089,7 +4823,6 @@ public class ScreenMapaTiled implements Screen, InputProcessor {
             conexion.desconectar();
             conexion = null;
         }
-
 
         batch = null;
         stage = null;

@@ -24,7 +24,6 @@
 			"PP": 25
 		},
 		"nivel": 2,
-		"actualHP": 65,
 		"maxHp": 80,
 		"danoAtaque": 74,
 		"danoDefensa": 59,

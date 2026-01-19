@@ -13,7 +13,7 @@ import com.badlogic.gdx.utils.JsonWriter;
 public class Inventario {
 
     // Límite máximo de unidades que se pueden tener de CADA objeto
-    public static final int MAX_QUANTITY = 99;
+    public static final int MAX_QUANTITY = 30;
     private final Map<Integer, Integer> objetos;
 
     public Inventario() {
@@ -123,7 +123,6 @@ public class Inventario {
         if (file.exists()) {
             try {
                 Json json = new Json();
-                // We load as a raw Map first because LibGDX JSON might load keys as Strings
                 Map loadedRaw = json.fromJson(HashMap.class, file.readString());
                 if (loadedRaw != null) {
                     objetos.clear();
